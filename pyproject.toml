@@ -1,0 +1,12 @@
+[project]
+name = "solid-etl-refactor-template"
+version = "0.2.0"
+description = "Refactored ETL template"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0",
+  "psycopg2-binary>=2.9.9",
+  "python-dotenv>=1.0.1",
+  "sqlalchemy>=2.0.0",
+  "python-jobspy>=1.1.80",
+]
