@@ -36,16 +36,19 @@ class BasePostgresSQLWriter:
             "is_current": Boolean(),
         }
 
-    def _stage_dataframe(self, df: DataFrame):
+    def _stage_dataframe(self, df: DataFrame, chunk_size: int | None = None):
         engine = self.connector.connect()
         dtype_map = {k: v for k, v in self._dtype_map().items() if k in df.columns}
+
         with engine.begin() as conn:
             conn.execute(text(f'DROP TABLE IF EXISTS "{self.temp_table_name}"'))
+
         df.to_sql(
             name=self.temp_table_name,
             con=engine,
             if_exists="replace",
             index=False,
+            chunksize=chunk_size,
             dtype=dtype_map,
         )
         return engine, dtype_map

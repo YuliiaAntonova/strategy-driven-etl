@@ -25,7 +25,8 @@ def main():
     etl_parser.add_argument("--date-column", default="date_loaded")
     etl_parser.add_argument("--primary-key", default=None)
     etl_parser.add_argument("--hash-column", default="row_hash")
-
+    etl_parser.add_argument("--extract-chunk-size", type=int, default=None)
+    etl_parser.add_argument("--write-chunk-size", type=int, default=None)
     ingest_parser = subparsers.add_parser("run-jobs-ingestion")
     ingest_parser.add_argument("--dataset", default="jobs")
     ingest_parser.add_argument("--dt", default=None)
@@ -40,6 +41,8 @@ def main():
             date_column=args.date_column,
             primary_key=args.primary_key,
             hash_column=args.hash_column,
+            extract_chunk_size=args.extract_chunk_size,
+            write_chunk_size=args.write_chunk_size,
         )
     elif args.command == "run-jobs-ingestion":
         output_file = run_jobs_ingestion(

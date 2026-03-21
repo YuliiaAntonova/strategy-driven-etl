@@ -11,7 +11,7 @@ class PostgresLoader(BaseLoader):
         self.table_name = table_name
         self.if_exists = if_exists
 
-    def load(self, df: DataFrame) -> None:
+    def load(self, df: DataFrame, chunk_size: int | None = None) -> None:
         engine = self.connector.connect()
 
         dtype_map = {
@@ -46,7 +46,11 @@ class PostgresLoader(BaseLoader):
             con=engine,
             if_exists=self.if_exists,
             index=False,
+            chunksize=chunk_size,
             dtype={k: v for k, v in dtype_map.items() if k in df.columns},
         )
 
-        print(f"Loaded {len(df)} rows into table '{self.table_name}' with mode '{self.if_exists}'")
+        print(
+            f"Loaded {len(df)} rows into table '{self.table_name}' "
+            f"with mode '{self.if_exists}'"
+        )

@@ -99,35 +99,63 @@ python3 -m pip install -U pip
 python3 -m pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy
 ```
 
+## Main commands
+
 ### 1. Jobs ingestion -> local CSV
+Downloads jobs and saves them into the source CSV file.
+
 ```bash
 python3 -m src.entrypoints.cli run-jobs-ingestion
 ```
 
 ### 2. Full load: CSV -> Postgres
+Loads the whole source file into Postgres.
+
 ```bash
 python3 -m src.entrypoints.cli run-etl --load-mode full
 ```
 
 ### 3. Incremental by date
+Loads only rows newer than the max value in the target date column.
+
 ```bash
-python3 -m src.entrypoints.cli run-etl --load-mode incremental-by-date --date-column date_loaded
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-date \
+  --date-column date_loaded
 ```
 
 ### 4. Incremental by primary key
+Loads only rows whose primary key does not yet exist in the target table.
+
 ```bash
-python3 -m src.entrypoints.cli run-etl --load-mode incremental-by-primary-key --primary-key job_url
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-primary-key \
+  --primary-key job_url
 ```
 
 ### 5. Incremental by hash
+Loads only rows whose `row_hash` does not yet exist in the target table.
+
 ```bash
-python3 -m src.entrypoints.cli run-etl --load-mode incremental-by-hash --hash-column row_hash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-hash \
+  --hash-column row_hash
 ```
 
 ### 6. Incremental by primary key + hash
-```bash
-python3 -m src.entrypoints.cli run-etl --load-mode incremental-by-primary-key-and-hash --primary-key job_url --hash-column row_hash
+Loads new rows and changed rows.
 
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-primary-key-and-hash \
+  --primary-key job_url \
+  --hash-column row_hash
+```
+
+### 7. Incremental by primary key + hash with versioned write
+Creates a new version only when the row with the same primary key changed.
+
+```bash
 python3 -m src.entrypoints.cli run-etl \
   --load-mode incremental-by-primary-key-and-hash \
   --write-mode versioned \
@@ -135,10 +163,105 @@ python3 -m src.entrypoints.cli run-etl \
   --hash-column row_hash
 ```
 
+## Write modes
+
+This template supports SQL-based write strategies through `src/infrastructure/writing/` and `--write-mode`:
+
+- `replace` — stage into `{table_name}_temp`, drop target, rename temp to target
+- `append` — stage into `{table_name}_temp`, then `INSERT INTO target SELECT ... FROM temp`
+- `upsert` — stage into `{table_name}_temp`, then `INSERT ... ON CONFLICT DO UPDATE` using the primary key
+- `versioned` — stage into `{table_name}_temp`, then close old current rows and insert new versions
+
+## Recommended command combinations
+
+### Full + replace
+Best for first load or full rebuild of the table.
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode full \
+  --write-mode replace
+```
+
+### Full + append
+Adds the whole file again. Useful only when you really want duplicate history.
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode full \
+  --write-mode append
+```
+
+### Full + append + chunks
+Same as full append, but extraction and writing are split into batches.
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode full \
+  --write-mode append \
+  --extract-chunk-size 10000 \
+  --write-chunk-size 5000
+```
+
+Example output:
+
+```text
+Appended 20 rows into 'jobs' from staging 'jobs_temp'
+```
+
+### Incremental by primary key + upsert
+Keeps one current row per primary key and updates it on conflict.
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-primary-key \
+  --write-mode upsert \
+  --primary-key job_url
+```
+
+### Incremental by primary key + hash + versioned
+Best choice when you need row history.
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode incremental-by-primary-key-and-hash \
+  --write-mode versioned \
+  --primary-key job_url \
+  --hash-column row_hash
+```
+
+## Chunk options
+
+- `--extract-chunk-size` — how many rows to read from the source in one batch
+- `--write-chunk-size` — how many rows to write into Postgres in one batch
+
+Example with chunks:
+
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --load-mode full \
+  --write-mode append \
+  --extract-chunk-size 10000 \
+  --write-chunk-size 5000
+```
+
+Use chunk options when:
+
+- the source file is large
+- you want lower memory usage
+- you want more controlled writes to Postgres
+
 ## Strategy behavior
+
+Default behavior without explicit `--write-mode`:
 
 - `full` -> `replace`
 - all `incremental-*` -> `append`
+
+That means:
+
+- `full + append` can create duplicates if you run the same load many times
+- `incremental-by-primary-key-and-hash + versioned` does not load unchanged rows
 
 ## Env
 
@@ -169,19 +292,6 @@ psql -h localhost -U postgres -d world -c "drop table if exists jobs;"
 python3 -m src.entrypoints.cli run-etl --load-mode full
 ```
 
+If old duplicates were already inserted with `full + append`, recreate the table once and then switch to a safer mode such as `upsert` or `versioned`.
+
 Versioned write mode uses a staging table named `{table_name}_temp` and performs SQL `UPDATE + INSERT` from staging into the target table.
-
-## Write modes
-
-This template now supports SQL-based write strategies through `src/infrastructure/writing/` and `--write-mode`:
-
-- `replace` — stage into `{table_name}_temp`, drop target, rename temp to target
-- `append` — stage into `{table_name}_temp`, then `INSERT INTO target SELECT ... FROM temp`
-- `upsert` — stage into `{table_name}_temp`, then `INSERT ... ON CONFLICT DO UPDATE` using the primary key
-- `versioned` — stage into `{table_name}_temp`, then close old current rows and insert new versions
-
-Example:
-
-```bash
-python3 -m src.entrypoints.cli run-etl --load-mode incremental-by-primary-key-and-hash --write-mode versioned --primary-key job_url --hash-column row_hash
-```

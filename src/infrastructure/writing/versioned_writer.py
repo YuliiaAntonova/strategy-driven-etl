@@ -10,13 +10,13 @@ class VersionedWriteStrategy(BaseWriteStrategy, BasePostgresSQLWriter):
         BasePostgresSQLWriter.__init__(self, connector=connector, table_name=table_name)
         self.primary_key = primary_key
 
-    def write(self, df: DataFrame) -> None:
+    def write(self, df: DataFrame, chunk_size: int | None = None) -> None:
         if df.empty:
             print("No rows to write")
             return
         if self.primary_key not in df.columns:
             raise ValueError(f"Primary key column '{self.primary_key}' not found in dataframe")
-        engine, _ = self._stage_dataframe(df)
+        engine, _ = self._stage_dataframe(df, chunk_size=chunk_size)
         if not self._target_exists(engine):
             with engine.begin() as conn:
                 conn.execute(text(f'ALTER TABLE "{self.temp_table_name}" RENAME TO "{self.table_name}"'))
