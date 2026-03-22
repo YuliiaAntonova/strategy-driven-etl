@@ -10,3 +10,7 @@ dependencies = [
   "sqlalchemy>=2.0.0",
   "python-jobspy>=1.1.80",
 ]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
