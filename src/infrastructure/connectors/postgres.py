@@ -17,8 +17,15 @@ class PostgreSQLConnector(BaseConnector):
         self.user = user
         self.password = password
         self.port = port
+        self._engine = create_engine(
+            (
+                f"postgresql+psycopg2://{self.user}:{self.password}"
+                f"@{self.host}:{self.port}/{self.database}"
+            )
+        )
 
     def connect(self):
-        return create_engine(
-            f"postgresql+psycopg2://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
-        )
+        return self._engine
+
+    def get_engine(self):
+        return self._engine

@@ -1,46 +1,76 @@
+from __future__ import annotations
+
 from pandas import DataFrame
 from sqlalchemy import text
 
-from src.domain.contracts.write_strategy import BaseWriteStrategy
 from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
 
 
-class UpsertWriteStrategy(BaseWriteStrategy, BasePostgresSQLWriter):
+class UpsertWriteStrategy(BasePostgresSQLWriter):
     def __init__(self, connector, table_name: str, primary_key: str):
-        BasePostgresSQLWriter.__init__(self, connector=connector, table_name=table_name)
-        self.primary_key = primary_key
-
-    def write(self, df: DataFrame, chunk_size: int | None = None) -> None:
-        if df.empty:
-            print("No rows to write")
-            return
-        if self.primary_key not in df.columns:
-            raise ValueError(f"Primary key column '{self.primary_key}' not found in dataframe")
-        engine, _ = self._stage_dataframe(df, chunk_size=chunk_size)
-        if not self._target_exists(engine):
-            with engine.begin() as conn:
-                conn.execute(text(f'ALTER TABLE "{self.temp_table_name}" RENAME TO "{self.table_name}"'))
-                conn.execute(text(
-                    f'CREATE UNIQUE INDEX IF NOT EXISTS "ux_{self.table_name}_{self.primary_key}" ON "{self.table_name}" ("{self.primary_key}")'
-                ))
-            print(f"Initialized '{self.table_name}' from staging '{self.temp_table_name}'")
-            return
-        cols = list(df.columns)
-        insert_cols = ", ".join(f'"{c}"' for c in cols)
-        select_cols = ", ".join(f's."{c}"' for c in cols)
-        update_cols = [c for c in cols if c != self.primary_key]
-        update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
-        sql = text(
-            f'''INSERT INTO "{self.table_name}" ({insert_cols})
-                SELECT {select_cols}
-                FROM "{self.temp_table_name}" s
-                ON CONFLICT ("{self.primary_key}") DO UPDATE
-                SET {update_set}'''
+        super().__init__(
+            connector=connector,
+            table_name=table_name,
+            primary_key=primary_key,
         )
+
+    def requires_primary_key(self) -> bool:
+        return True
+
+    def _initialize_target(self, engine, df: DataFrame) -> None:
+        self._rename_temp_to_target(engine)
+
         with engine.begin() as conn:
-            conn.execute(text(
-                f'CREATE UNIQUE INDEX IF NOT EXISTS "ux_{self.table_name}_{self.primary_key}" ON "{self.table_name}" ("{self.primary_key}")'
-            ))
+            index_name = self._build_unique_index_name(
+                self.table_name,
+                self.primary_key,
+            )
+            conn.execute(
+                text(
+                    f'CREATE UNIQUE INDEX IF NOT EXISTS "{index_name}" '
+                    f'ON "{self.table_name}" ("{self.primary_key}")'
+                )
+            )
+
+        print(
+            f"Initialized '{self.table_name}' with {len(df)} rows "
+            f"and unique index on '{self.primary_key}'"
+        )
+
+    def _write_to_existing_target(self, engine, df: DataFrame) -> None:
+        columns = list(df.columns)
+        quoted_columns = [f'"{column}"' for column in columns]
+        insert_columns_sql = ", ".join(quoted_columns)
+        select_columns_sql = ", ".join(quoted_columns)
+
+        update_columns = [column for column in columns if column != self.primary_key]
+        update_assignments = ", ".join(
+            f'"{column}" = EXCLUDED."{column}"' for column in update_columns
+        )
+
+        index_name = self._build_unique_index_name(self.table_name, self.primary_key)
+
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    f'CREATE UNIQUE INDEX IF NOT EXISTS "{index_name}" '
+                    f'ON "{self.table_name}" ("{self.primary_key}")'
+                )
+            )
+
+            sql = text(
+                f'''
+                INSERT INTO "{self.table_name}" ({insert_columns_sql})
+                SELECT {select_columns_sql}
+                FROM "{self.temp_table_name}"
+                ON CONFLICT ("{self.primary_key}")
+                DO UPDATE
+                SET {update_assignments}
+                '''
+            )
             result = conn.execute(sql)
-            conn.execute(text(f'DROP TABLE IF EXISTS "{self.temp_table_name}"'))
-        print(f"Upserted {result.rowcount} rows into '{self.table_name}' from staging '{self.temp_table_name}'")
+
+        print(
+            f"Upserted {result.rowcount} rows into '{self.table_name}' "
+            f"using primary key '{self.primary_key}'"
+        )
