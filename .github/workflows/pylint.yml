@@ -1,23 +1,50 @@
-name: Pylint
+name: Python CI
 
-on: [push]
+on:
+  push:
+    branches: [devel]
+  pull_request:
+    branches: [devel]
+  workflow_dispatch:
 
 jobs:
-  build:
+  quality:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pylint
-    - name: Analysing the code with pylint
-      run: |
-        pylint $(git ls-files '*.py')
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+
+      - name: Upgrade pip
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+          pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy pylint
+
+      - name: Compile source
+        run: |
+          python -m compileall src
+
+      - name: Import smoke check
+        run: |
+          python -c "import src.entrypoints.cli"
+          python -c "import pandas, sqlalchemy, dotenv"
+
+      - name: Run pylint
+        run: |
+          pylint src
