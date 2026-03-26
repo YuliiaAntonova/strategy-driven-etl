@@ -1,5 +1,8 @@
 from src.application.use_cases.run_pipeline import run_pipeline
 from src.config.settings import settings
+from src.domain.contracts.extractor import BaseExtractor
+from src.domain.contracts.loader import BaseLoader
+from src.domain.contracts.transformer import BaseTransformer
 from src.domain.models.pipeline_context import PipelineContext
 from src.infrastructure.extractors.jobs_api import JobsApiExtractor
 from src.infrastructure.loaders.csv import CSVLoader
@@ -10,6 +13,9 @@ def run_jobs_ingestion(
     dataset: str = "jobs",
     dt: str | None = None,
     run_id: str | None = None,
+    extractor: BaseExtractor | None = None,
+    transformer: BaseTransformer | None = None,
+    loader: BaseLoader | None = None,
 ) -> str:
     if dataset != "jobs":
         raise ValueError("For now only dataset='jobs' is implemented")
@@ -21,16 +27,16 @@ def run_jobs_ingestion(
         environment=settings.environment,
     )
 
-    extractor = JobsApiExtractor(
+    extractor = extractor or JobsApiExtractor(
         search_term=settings.jobs_search_term,
         location=settings.jobs_location,
         results_wanted=settings.jobs_results_wanted,
     )
-    transformer = JobsAuditTransformer(
+    transformer = transformer or JobsAuditTransformer(
         context=context,
         source_name=settings.source_name,
     )
-    loader = CSVLoader(file_path=settings.source_file)
+    loader = loader or CSVLoader(file_path=settings.source_file)
 
     run_pipeline(
         extractor=extractor,

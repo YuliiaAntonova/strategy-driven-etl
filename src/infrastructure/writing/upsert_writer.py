@@ -4,6 +4,7 @@ from pandas import DataFrame
 from sqlalchemy import text
 
 from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.writing.utils import quote_identifiers
 
 
 class UpsertWriteStrategy(BasePostgresSQLWriter):
@@ -39,7 +40,7 @@ class UpsertWriteStrategy(BasePostgresSQLWriter):
 
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
         columns = list(df.columns)
-        quoted_columns = [f'"{column}"' for column in columns]
+        quoted_columns = quote_identifiers(columns)
         insert_columns_sql = ", ".join(quoted_columns)
         select_columns_sql = ", ".join(quoted_columns)
 

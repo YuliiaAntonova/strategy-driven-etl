@@ -4,6 +4,10 @@ from pandas import DataFrame
 from sqlalchemy import text
 
 from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.writing.utils import (
+    quote_identifiers,
+    build_versioned_dedup_cte,
+)
 
 
 class VersionedWriteStrategy(BasePostgresSQLWriter):
@@ -56,7 +60,7 @@ class VersionedWriteStrategy(BasePostgresSQLWriter):
         print(f"Initialized versioned table '{self.table_name}' with {len(df)} rows")
 
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
-        quoted_columns = [f'"{column}"' for column in df.columns]
+        quoted_columns = quote_identifiers(df.columns)
         insert_columns_sql = ", ".join(quoted_columns)
 
         select_columns_sql_parts = []
@@ -71,28 +75,12 @@ class VersionedWriteStrategy(BasePostgresSQLWriter):
 
         select_columns_sql = ", ".join(select_columns_sql_parts)
 
-        dedup_staging_cte = f'''
-            WITH staged AS (
-                SELECT *
-                FROM (
-                    SELECT
-                        staged_source.*,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY staged_source."{self.primary_key}"
-                            ORDER BY staged_source."date_loaded" DESC NULLS LAST
-                        ) AS row_number_rank
-                    FROM "{self.temp_table_name}" staged_source
-                ) ranked_stage
-                WHERE ranked_stage.row_number_rank = 1
-            ),
-            latest_target AS (
-                SELECT DISTINCT ON (target."{self.primary_key}")
-                    target.*
-                FROM "{self.table_name}" target
-                WHERE target."is_current" = true
-                ORDER BY target."{self.primary_key}", target."date_loaded" DESC NULLS LAST
-            )
-        '''
+        dedup_staging_cte = build_versioned_dedup_cte(
+            temp_table_name=self.temp_table_name,
+            target_table_name=self.table_name,
+            primary_key=self.primary_key,
+            only_current=True,
+        )
 
         close_previous_versions_sql = text(
             dedup_staging_cte

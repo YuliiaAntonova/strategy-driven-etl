@@ -11,10 +11,10 @@ class S3CsvLoader(BaseLoader):
         self.connector = connector
         self.key = key
 
-    def load(self, data: pd.DataFrame) -> None:
+    def load(self, df: pd.DataFrame, chunk_size: int | None = None) -> None:
         s3 = self.connector.connect()
         buf = StringIO()
-        data.to_csv(buf, index=False)
+        df.to_csv(buf, index=False)
         s3.put_object(
             Bucket=self.connector.bucket_name,
             Key=self.key,

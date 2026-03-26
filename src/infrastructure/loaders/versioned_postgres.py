@@ -1,8 +1,14 @@
 from pandas import DataFrame
-from sqlalchemy import String, Text, Float, Integer, DateTime, Boolean, text, inspect
+from sqlalchemy import text, inspect
 
 from src.domain.contracts.loader import BaseLoader
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
+from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
+from src.infrastructure.utils.temp_table import stage_dataframe_to_temp
+from src.infrastructure.writing.utils import (
+    build_versioned_dedup_cte,
+    quote_identifiers,
+)
 
 
 class VersionedPostgresLoader(BaseLoader):
@@ -18,34 +24,9 @@ class VersionedPostgresLoader(BaseLoader):
         self.temp_table_name = f"{table_name}_temp"
 
     def _dtype_map(self) -> dict:
-        return {
-            "job_url": Text(),
-            "site": String(100),
-            "title": Text(),
-            "company": Text(),
-            "location": Text(),
-            "job_type": String(100),
-            "date_posted": String(50),
-            "interval": String(50),
-            "min_amount": Float(),
-            "max_amount": Float(),
-            "currency": String(50),
-            "is_remote": String(50),
-            "num_urgent_words": Integer(),
-            "benefits": Text(),
-            "emails": Text(),
-            "description": Text(),
-            "source_name": String(100),
-            "run_id": String(100),
-            "dt": String(50),
-            "date_created": DateTime(timezone=True),
-            "date_loaded": DateTime(timezone=True),
-            "environment": String(50),
-            "row_hash": String(64),
-            "is_current": Boolean(),
-        }
+        return JOBS_DTYPE_MAP
 
-    def load(self, df: DataFrame) -> None:
+    def load(self, df: DataFrame, chunk_size: int | None = None) -> None:
         if df.empty:
             print("No rows to load")
             return
@@ -57,12 +38,11 @@ class VersionedPostgresLoader(BaseLoader):
         dtype_map = {k: v for k, v in self._dtype_map().items() if k in df.columns}
 
         # Always land the incoming batch into a staging table named {table_name}_temp.
-        df.to_sql(
-            name=self.temp_table_name,
-            con=engine,
-            if_exists="replace",
-            index=False,
-            dtype=dtype_map,
+        stage_dataframe_to_temp(
+            df=df,
+            engine=engine,
+            temp_table_name=self.temp_table_name,
+            dtype_map=dtype_map,
         )
 
         inspector = inspect(engine)
@@ -83,7 +63,7 @@ class VersionedPostgresLoader(BaseLoader):
             print(f"Loaded {len(df)} versioned rows into table '{self.table_name}'")
             return
 
-        quoted_columns = [f'"{column}"' for column in df.columns]
+        quoted_columns = quote_identifiers(df.columns)
         select_columns = []
         for column in df.columns:
             if column == "date_created":
@@ -91,27 +71,12 @@ class VersionedPostgresLoader(BaseLoader):
             else:
                 select_columns.append(f's."{column}"')
 
-        dedup_staging_cte = f"""
-            WITH staged AS (
-                SELECT *
-                FROM (
-                    SELECT
-                        s.*,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY s."{self.primary_key}"
-                            ORDER BY s."date_loaded" DESC NULLS LAST
-                        ) AS rn
-                    FROM "{self.temp_table_name}" s
-                ) ranked
-                WHERE ranked.rn = 1
-            ),
-            latest_target AS (
-                SELECT DISTINCT ON (t."{self.primary_key}")
-                    t.*
-                FROM "{self.table_name}" t
-                ORDER BY t."{self.primary_key}", t."date_loaded" DESC NULLS LAST
-            )
-        """
+        dedup_staging_cte = build_versioned_dedup_cte(
+            temp_table_name=self.temp_table_name,
+            target_table_name=self.table_name,
+            primary_key=self.primary_key,
+            only_current=False,
+        )
 
         update_sql = text(
             dedup_staging_cte

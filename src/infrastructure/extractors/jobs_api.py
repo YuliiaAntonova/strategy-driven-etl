@@ -13,8 +13,8 @@ class JobsApiExtractor(BaseExtractor):
     def extract(self) -> DataFrame:
         jobs = scrape_jobs(
             site_name=["linkedin"],
-            search_term="java python",
-            location="Berlin",
-            results_wanted=20,
+            search_term=self.search_term,
+            location=self.location,
+            results_wanted=self.results_wanted,
         )
         return jobs

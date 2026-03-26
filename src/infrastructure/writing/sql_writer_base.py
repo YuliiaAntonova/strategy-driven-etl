@@ -3,9 +3,11 @@ from __future__ import annotations
 from abc import abstractmethod
 
 from pandas import DataFrame
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, inspect, text
+from sqlalchemy import inspect, text
 
 from src.domain.contracts.write_strategy import BaseWriteStrategy
+from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
+from src.infrastructure.utils.temp_table import stage_dataframe_to_temp
 
 
 class BasePostgresSQLWriter(BaseWriteStrategy):
@@ -47,47 +49,18 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
         return False
 
     def _dtype_map(self) -> dict:
-        return {
-            "job_url": Text(),
-            "site": String(100),
-            "title": Text(),
-            "company": Text(),
-            "location": Text(),
-            "job_type": String(100),
-            "date_posted": String(50),
-            "interval": String(50),
-            "min_amount": Float(),
-            "max_amount": Float(),
-            "currency": String(50),
-            "is_remote": String(50),
-            "num_urgent_words": Integer(),
-            "benefits": Text(),
-            "emails": Text(),
-            "description": Text(),
-            "source_name": String(100),
-            "run_id": String(100),
-            "dt": String(50),
-            "date_created": DateTime(timezone=True),
-            "date_loaded": DateTime(timezone=True),
-            "environment": String(50),
-            "row_hash": String(64),
-            "is_current": Boolean(),
-        }
+        return JOBS_DTYPE_MAP
 
     def _stage_dataframe(self, df: DataFrame, chunk_size: int | None = None):
         engine = self.connector.connect()
         dtype_map = {key: value for key, value in self._dtype_map().items() if key in df.columns}
 
-        with engine.begin() as conn:
-            conn.execute(text(f'DROP TABLE IF EXISTS "{self.temp_table_name}"'))
-
-        df.to_sql(
-            name=self.temp_table_name,
-            con=engine,
-            if_exists="replace",
-            index=False,
-            chunksize=chunk_size,
-            dtype=dtype_map,
+        stage_dataframe_to_temp(
+            df=df,
+            engine=engine,
+            temp_table_name=self.temp_table_name,
+            dtype_map=dtype_map,
+            chunk_size=chunk_size,
         )
         return engine, dtype_map
 

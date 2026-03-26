@@ -4,12 +4,12 @@ from pandas import DataFrame
 from sqlalchemy import text
 
 from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.writing.utils import quote_identifiers
 
 
 class AppendWriteStrategy(BasePostgresSQLWriter):
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
-        columns = [f'"{column}"' for column in df.columns]
-        columns_sql = ", ".join(columns)
+        columns_sql = ", ".join(quote_identifiers(df.columns))
 
         sql = text(
             f'''

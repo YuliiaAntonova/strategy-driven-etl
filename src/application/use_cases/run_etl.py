@@ -3,6 +3,8 @@ from pathlib import Path
 from src.application.services.load_strategy_factory import get_load_strategy
 from src.application.services.write_strategy_factory import get_write_strategy
 from src.config.settings import settings
+from src.domain.contracts.extractor import BaseExtractor
+from src.domain.contracts.transformer import BaseTransformer
 from src.domain.models.pipeline_context import PipelineContext
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
 from src.infrastructure.extractors.csv import CSVExtractor
@@ -19,6 +21,8 @@ def run_etl(
     hash_column: str = "row_hash",
     extract_chunk_size: int | None = None,
     write_chunk_size: int | None = None,
+    extractor: BaseExtractor | None = None,
+    transformer: BaseTransformer | None = None,
 ) -> None:
     source_path = Path(settings.source_file)
 
@@ -42,8 +46,8 @@ def run_etl(
         port=settings.postgres_port,
     )
 
-    extractor = CSVExtractor(file_path=str(source_path))
-    transformer = JobsAuditTransformer(
+    extractor = extractor or CSVExtractor(file_path=str(source_path))
+    transformer = transformer or JobsAuditTransformer(
         context=context,
         source_name=settings.source_name,
     )
@@ -64,75 +68,54 @@ def run_etl(
     except Exception:
         existing_df = None
 
+    def _process_batch(batch_df, is_first_batch: bool) -> bool:
+        nonlocal existing_df
+
+        batch_df = transformer.transform(batch_df)
+
+        hash_transformer = HashColumnsTransformer(
+            columns=settings.hash_columns,
+            output_column=hash_column,
+        )
+        batch_df = hash_transformer.transform(batch_df)
+
+        current_existing_df = (
+            batch_df.iloc[0:0].copy()
+            if existing_df is None
+            else existing_df
+        )
+
+        load_df = load_strategy.prepare(
+            incoming_df=batch_df,
+            existing_df=current_existing_df,
+        )
+
+        if load_df.empty:
+            return False
+
+        effective_write_mode = write_mode
+        if write_mode == "replace" and extract_chunk_size:
+            effective_write_mode = "replace" if is_first_batch else "append"
+
+        write_strategy = get_write_strategy(
+            write_mode=effective_write_mode,
+            connector=connector,
+            table_name=settings.target_table,
+            primary_key=primary_key,
+        )
+        write_strategy.write(load_df, chunk_size=write_chunk_size)
+        return True
+
     if extract_chunk_size:
         first_chunk = True
 
         for chunk_df in extractor.extract_in_chunks(extract_chunk_size):
-            chunk_df = transformer.transform(chunk_df)
-
-            hash_transformer = HashColumnsTransformer(
-                columns=settings.hash_columns,
-                output_column=hash_column,
-            )
-            chunk_df = hash_transformer.transform(chunk_df)
-
-            current_existing_df = (
-                chunk_df.iloc[0:0].copy()
-                if existing_df is None
-                else existing_df
-            )
-
-            load_df = load_strategy.prepare(
-                incoming_df=chunk_df,
-                existing_df=current_existing_df,
-            )
-
-            if load_df.empty:
-                continue
-
-            effective_write_mode = write_mode
-            if write_mode == "replace":
-                effective_write_mode = "replace" if first_chunk else "append"
-
-            chunk_write_strategy = get_write_strategy(
-                write_mode=effective_write_mode,
-                connector=connector,
-                table_name=settings.target_table,
-                primary_key=primary_key,
-            )
-            chunk_write_strategy.write(load_df, chunk_size=write_chunk_size)
-            first_chunk = False
-
+            wrote_rows = _process_batch(chunk_df, is_first_batch=first_chunk)
+            if wrote_rows and first_chunk:
+                first_chunk = False
         return
 
     incoming_df = extractor.extract()
-    incoming_df = transformer.transform(incoming_df)
-
-    hash_transformer = HashColumnsTransformer(
-        columns=settings.hash_columns,
-        output_column=hash_column,
-    )
-    incoming_df = hash_transformer.transform(incoming_df)
-
-    current_existing_df = (
-        incoming_df.iloc[0:0].copy()
-        if existing_df is None
-        else existing_df
-    )
-
-    load_df = load_strategy.prepare(
-        incoming_df=incoming_df,
-        existing_df=current_existing_df,
-    )
-
-    if load_df.empty:
+    wrote_rows = _process_batch(incoming_df, is_first_batch=True)
+    if not wrote_rows:
         print("No data to load")
-        return
-
-    write_strategy = get_write_strategy(
-        write_mode=write_mode,
-        connector=connector,
-        table_name=settings.target_table,
-        primary_key=primary_key,
-    )
-    write_strategy.write(load_df, chunk_size=write_chunk_size)
