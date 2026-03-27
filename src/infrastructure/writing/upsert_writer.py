@@ -19,9 +19,23 @@ class UpsertWriteStrategy(BasePostgresSQLWriter):
         return True
 
     def _initialize_target(self, engine, df: DataFrame) -> None:
-        self._rename_temp_to_target(engine)
+        self._rename_temp_to_target(engine);
 
         with engine.begin() as conn:
+            # Remove duplicates before creating the unique index
+            conn.execute(
+                text(
+                    f'''
+                    DELETE FROM "{self.table_name}"
+                    WHERE ctid NOT IN (
+                        SELECT MIN(ctid)
+                        FROM "{self.table_name}"
+                        GROUP BY "{self.primary_key}"
+                    )
+                    '''
+                )
+            )
+
             index_name = self._build_unique_index_name(
                 self.table_name,
                 self.primary_key,
@@ -52,6 +66,20 @@ class UpsertWriteStrategy(BasePostgresSQLWriter):
         index_name = self._build_unique_index_name(self.table_name, self.primary_key)
 
         with engine.begin() as conn:
+            # Remove duplicates before creating the unique index
+            conn.execute(
+                text(
+                    f'''
+                    DELETE FROM "{self.table_name}"
+                    WHERE ctid NOT IN (
+                        SELECT MIN(ctid)
+                        FROM "{self.table_name}"
+                        GROUP BY "{self.primary_key}"
+                    )
+                    '''
+                )
+            )
+
             conn.execute(
                 text(
                     f'CREATE UNIQUE INDEX IF NOT EXISTS "{index_name}" '
@@ -64,14 +92,10 @@ class UpsertWriteStrategy(BasePostgresSQLWriter):
                 INSERT INTO "{self.table_name}" ({insert_columns_sql})
                 SELECT {select_columns_sql}
                 FROM "{self.temp_table_name}"
-                ON CONFLICT ("{self.primary_key}")
-                DO UPDATE
-                SET {update_assignments}
+                ON CONFLICT ("{self.primary_key}") DO UPDATE SET {update_assignments}
                 '''
             )
+
             result = conn.execute(sql)
 
-        print(
-            f"Upserted {result.rowcount} rows into '{self.table_name}' "
-            f"using primary key '{self.primary_key}'"
-        )
+        print(f"Upserted {result.rowcount} rows into '{self.table_name}'")

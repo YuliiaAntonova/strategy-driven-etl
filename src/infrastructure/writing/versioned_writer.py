@@ -60,62 +60,33 @@ class VersionedWriteStrategy(BasePostgresSQLWriter):
         print(f"Initialized versioned table '{self.table_name}' with {len(df)} rows")
 
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
-        quoted_columns = quote_identifiers(df.columns)
-        insert_columns_sql = ", ".join(quoted_columns)
-
-        select_columns_sql_parts = []
-        for column in df.columns:
-            if column == "date_created":
-                select_columns_sql_parts.append(
-                    'COALESCE(latest_target."date_created", staged."date_created") '
-                    'AS "date_created"'
-                )
-            else:
-                select_columns_sql_parts.append(f'staged."{column}"')
-
-        select_columns_sql = ", ".join(select_columns_sql_parts)
-
-        dedup_staging_cte = build_versioned_dedup_cte(
-            temp_table_name=self.temp_table_name,
-            target_table_name=self.table_name,
-            primary_key=self.primary_key,
-            only_current=True,
-        )
-
-        close_previous_versions_sql = text(
-            dedup_staging_cte
-            + f'''
-            UPDATE "{self.table_name}" target
-            SET "is_current" = false
-            FROM staged
-            WHERE target."{self.primary_key}" = staged."{self.primary_key}"
-              AND target."is_current" = true
-              AND COALESCE(target."row_hash", '') <> COALESCE(staged."row_hash", '')
-            '''
-        )
-
-        insert_new_versions_sql = text(
-            dedup_staging_cte
-            + f'''
-            INSERT INTO "{self.table_name}" ({insert_columns_sql})
-            SELECT {select_columns_sql}
-            FROM staged
-            LEFT JOIN latest_target
-              ON latest_target."{self.primary_key}" = staged."{self.primary_key}"
-            WHERE latest_target."{self.primary_key}" IS NULL
-               OR COALESCE(latest_target."row_hash", '')
-                  <> COALESCE(staged."row_hash", '')
-            '''
-        )
+        columns_sql = ", ".join(quote_identifiers(df.columns))
 
         with engine.begin() as conn:
-            updated_result = conn.execute(close_previous_versions_sql)
-            inserted_result = conn.execute(insert_new_versions_sql)
+            # Remove duplicates before inserting new versions
+            conn.execute(
+                text(
+                    f'''
+                    DELETE FROM "{self.table_name}"
+                    WHERE ctid NOT IN (
+                        SELECT MIN(ctid)
+                        FROM "{self.table_name}"
+                        GROUP BY "{self.primary_key}"
+                    )
+                    '''
+                )
+            )
 
-        print(
-            f"Closed previous current versions for {updated_result.rowcount} rows"
-        )
-        print(
-            f"Inserted {inserted_result.rowcount} new/changed versioned rows "
-            f"into '{self.table_name}'"
-        )
+            dedup_cte = build_versioned_dedup_cte(self.table_name, self.primary_key)
+            sql = text(
+                f'''
+                WITH dedup AS ({dedup_cte})
+                INSERT INTO "{self.table_name}" ({columns_sql})
+                SELECT {columns_sql}
+                FROM dedup
+                '''
+            )
+
+            result = conn.execute(sql)
+
+        print(f"Versioned {result.rowcount} rows into '{self.table_name}'")
