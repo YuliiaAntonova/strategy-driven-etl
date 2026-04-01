@@ -7,7 +7,7 @@ from pandas import DataFrame
 from src.domain.models.change_set import ChangeSet
 
 
-class BaseWriteStrategy(ABC):
+class BaseChangeDetector(ABC):
     @abstractmethod
-    def write(self, df: DataFrame | ChangeSet, chunk_size: int | None = None) -> None:
+    def detect(self, incoming_df: DataFrame, existing_df: DataFrame) -> ChangeSet:
         raise NotImplementedError

@@ -12,23 +12,8 @@ class AppendWriteStrategy(BasePostgresSQLWriter):
         columns_sql = ", ".join(quote_identifiers(df.columns))
 
         with engine.begin() as conn:
-            # Remove duplicates before appending new data
-            conn.execute(
-                text(
-                    f'''
-                    DELETE FROM "{self.table_name}"
-                    WHERE ctid NOT IN (
-                        SELECT MIN(ctid)
-                        FROM "{self.table_name}"
-                        GROUP BY "{self.primary_key}"
-                    )
-                    '''
-                )
-            )
-
             sql = text(
-                f'''
-                INSERT INTO "{self.table_name}" ({columns_sql})
+                f'''                INSERT INTO "{self.table_name}" ({columns_sql})
                 SELECT {columns_sql}
                 FROM "{self.temp_table_name}"
                 '''

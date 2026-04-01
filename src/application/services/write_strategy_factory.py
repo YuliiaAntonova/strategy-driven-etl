@@ -16,13 +16,21 @@ WriteStrategyFactory = Callable[[object, str, str | None], BaseWriteStrategy]
 def _replace_write_factory(
     connector, table_name: str, primary_key: str | None
 ) -> BaseWriteStrategy:
-    return ReplaceWriteStrategy(connector=connector, table_name=table_name)
+    return ReplaceWriteStrategy(
+        connector=connector,
+        table_name=table_name,
+        primary_key=primary_key,
+    )
 
 
 def _append_write_factory(
     connector, table_name: str, primary_key: str | None
 ) -> BaseWriteStrategy:
-    return AppendWriteStrategy(connector=connector, table_name=table_name)
+    return AppendWriteStrategy(
+        connector=connector,
+        table_name=table_name,
+        primary_key=primary_key,
+    )
 
 
 def _upsert_write_factory(

@@ -6,6 +6,7 @@ from pandas import DataFrame
 from sqlalchemy import inspect, text
 
 from src.domain.contracts.write_strategy import BaseWriteStrategy
+from src.domain.models.change_set import ChangeSet
 from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
 from src.infrastructure.utils.temp_table import stage_dataframe_to_temp
 
@@ -22,22 +23,28 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
         self.temp_table_name = f"{table_name}_temp"
         self.primary_key = primary_key
 
-    def write(self, df: DataFrame, chunk_size: int | None = None) -> None:
-        if df.empty:
+    def write(self, df: DataFrame | ChangeSet, chunk_size: int | None = None) -> None:
+        write_df = self._coerce_to_dataframe(df)
+        if write_df.empty:
             print("No rows to write")
             return
 
-        self._validate_input(df)
-        engine, _ = self._stage_dataframe(df, chunk_size=chunk_size)
+        self._validate_input(write_df)
+        engine, _ = self._stage_dataframe(write_df, chunk_size=chunk_size)
 
         try:
             if not self._target_exists(engine):
-                self._initialize_target(engine, df)
+                self._initialize_target(engine, write_df)
                 return
 
-            self._write_to_existing_target(engine, df)
+            self._write_to_existing_target(engine, write_df)
         finally:
             self._drop_temp_table(engine)
+
+    def _coerce_to_dataframe(self, df: DataFrame | ChangeSet) -> DataFrame:
+        if isinstance(df, ChangeSet):
+            return df.rows_to_write
+        return df
 
     def _validate_input(self, df: DataFrame) -> None:
         if self.requires_primary_key() and self.primary_key not in df.columns:
@@ -92,4 +99,4 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
 
     @abstractmethod
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
-        """Apply strategy-specific SQL against an existing target table."""
+        raise NotImplementedError
