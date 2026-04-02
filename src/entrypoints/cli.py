@@ -3,6 +3,7 @@ import argparse
 from src.application.ai.profiles import AI_PROFILES
 from src.application.pipeline.profiles import PIPELINE_PROFILES, DEFAULT_WRITE_MODE_BY_LOAD_MODE
 from src.application.use_cases.answer_query import answer_query
+from src.application.use_cases.ask_ai import ask_ai
 from src.application.use_cases.run_ai_indexing import run_ai_indexing
 from src.application.use_cases.run_etl import run_etl
 from src.application.use_cases.run_jobs_ingestion import run_jobs_ingestion
@@ -41,6 +42,12 @@ def main():
     ask_parser.add_argument("--profile", choices=AI_PROFILE_NAMES, default=None)
     ask_parser.add_argument("--top-k", type=int, default=None)
 
+    grounded_ask_parser = subparsers.add_parser("ask-ai")
+    grounded_ask_parser.add_argument("--question", required=True)
+    grounded_ask_parser.add_argument("--profile", choices=AI_PROFILE_NAMES, default=None)
+    grounded_ask_parser.add_argument("--top-k", type=int, default=None)
+    grounded_ask_parser.add_argument("--fetch-k", type=int, default=None)
+
     args = parser.parse_args()
 
     if args.command == "run-etl":
@@ -65,6 +72,8 @@ def main():
         run_ai_indexing(profile=args.profile)
     elif args.command == "answer-query":
         print(answer_query(question=args.question, profile=args.profile, top_k=args.top_k))
+    elif args.command == "ask-ai":
+        print(ask_ai(question=args.question, profile=args.profile, top_k=args.top_k, fetch_k=args.fetch_k))
 
 
 if __name__ == "__main__":

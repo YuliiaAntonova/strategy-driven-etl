@@ -312,3 +312,184 @@ psql -h localhost -U postgres -d world -c "drop table if exists ai_chunks;"
 python3 -m src.entrypoints.cli run-etl --profile full_refresh
 python3 -m src.entrypoints.cli run-ai-indexing
 ```
+
+
+## AI extension architecture
+
+The existing ETL and AI indexing layers stay unchanged. The project is extended with a new **grounded answering layer** on top of `ai_documents` and `ai_chunks`.
+
+### Why this extension exists
+
+The original `answer-query` command is a lightweight RAG flow:
+
+- read indexed chunks
+- retrieve top matches
+- format a response through a provider
+
+The new `ask-ai` flow adds a cleaner separation of concerns for production-style AI features:
+
+- retrieval
+- reranking
+- prompt building
+- grounded answer generation
+
+This keeps the data pipeline stable while making the AI layer easier to evolve.
+
+### New AI layers
+
+```text
+question
+  -> RetrievalService
+  -> RerankingService
+  -> PromptBuilder
+  -> AnswerGenerator
+  -> AnswerResult
+```
+
+### New contracts
+
+- `BaseReranker`
+- `BasePromptBuilder`
+- `BaseAnswerGenerator`
+
+### New application services
+
+- `GroundedAnswerService`
+- `RerankingService`
+- `GroundedAnswerServiceBuilder`
+
+### New infrastructure implementations
+
+- `KeywordMetadataReranker`
+- `GroundedAnswerPromptBuilder`
+- `TemplateAnswerGenerator`
+- `OpenAIAnswerGenerator`
+
+### Design notes
+
+- **ETL remains untouched**
+- **AI indexing remains untouched**
+- `answer-query` remains available for the lightweight local mode
+- `ask-ai` adds a richer grounded answering path without rewriting the existing architecture
+- all new dependencies are injected through registries and builders
+
+## Updated project structure
+
+```text
+src/
+  application/
+    pipeline/
+      pipeline.py
+      profiles.py
+      registry.py
+    ai/
+      profiles.py
+      registry.py
+      builders/
+        grounded_answer_builder.py
+      orchestration/
+        indexing_flow.py
+        rag_flow.py
+      services/
+        document_service.py
+        chunking_service.py
+        embedding_service.py
+        retrieval_service.py
+        reranking_service.py
+        llm_service.py
+        grounded_answer_service.py
+    use_cases/
+      run_etl.py
+      run_jobs_ingestion.py
+      run_ai_indexing.py
+      answer_query.py
+      ask_ai.py
+  domain/
+    contracts/
+      extractor.py
+      transformer.py
+      change_detector.py
+      write_strategy.py
+      chunker.py
+      embedder.py
+      retriever.py
+      llm_provider.py
+      ai_repository.py
+      reranker.py
+      prompt_builder.py
+      answer_generator.py
+    models/
+      change_set.py
+      pipeline_context.py
+      ai_document.py
+      chunk.py
+      retrieval_result.py
+      llm_response.py
+      answer_result.py
+  infrastructure/
+    connectors/
+    extractors/
+    detectors/
+    transformers/
+    writing/
+    ai/
+      repositories/
+      chunkers/
+      embedders/
+      retrievers/
+      providers/
+      rerankers/
+      prompts/
+      generators/
+  entrypoints/
+    cli.py
+```
+
+## New AI settings
+
+```env
+AI_FETCH_K=20
+AI_TOP_K=5
+AI_RERANKER=keyword_metadata
+AI_PROMPT_BUILDER=grounded
+AI_ANSWER_GENERATOR=template
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+```
+
+## New AI commands
+
+### Lightweight local RAG
+
+```bash
+python3 -m src.entrypoints.cli answer-query --question "Find remote Python jobs"
+```
+
+### Grounded AI answer (template generator)
+
+```bash
+python3 -m src.entrypoints.cli ask-ai --question "Find remote Python jobs" --profile jobs_rag_local
+```
+
+### Grounded AI answer (OpenAI generator)
+
+```bash
+python3 -m src.entrypoints.cli ask-ai --question "Find remote Python jobs" --profile jobs_rag_openai
+```
+
+### Recommended flow
+
+1. run job ingestion
+2. run ETL
+3. run AI indexing
+4. use `ask-ai` for grounded answers
+
+## Notes for future extensions
+
+This structure is intentionally ready for later additions without changing the core ETL code:
+
+- pgvector repository
+- embedding-based retriever
+- hybrid retriever
+- OpenRouter answer generator
+- planner/executor orchestration layer on top of `ask-ai`

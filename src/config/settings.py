@@ -39,7 +39,13 @@ class Settings:
     ai_llm_provider = os.getenv("AI_LLM_PROVIDER", "template")
     ai_chunk_size = int(os.getenv("AI_CHUNK_SIZE", "900"))
     ai_chunk_overlap = int(os.getenv("AI_CHUNK_OVERLAP", "120"))
+    ai_fetch_k = int(os.getenv("AI_FETCH_K", "20"))
     ai_top_k = int(os.getenv("AI_TOP_K", "5"))
+    ai_reranker = os.getenv("AI_RERANKER", "keyword_metadata")
+    ai_prompt_builder = os.getenv("AI_PROMPT_BUILDER", "grounded")
+    ai_answer_generator = os.getenv("AI_ANSWER_GENERATOR", "template")
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     ai_document_columns = _split_csv(os.getenv(
         "AI_DOCUMENT_COLUMNS",
         "id,title,company,location,job_type,description,skills,date_posted,job_url",
