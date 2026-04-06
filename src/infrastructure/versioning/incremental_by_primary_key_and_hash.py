@@ -2,6 +2,13 @@ import pandas as pd
 from pandas import DataFrame
 
 from src.domain.contracts.load_strategy import BaseLoadStrategy
+from src.infrastructure.versioning.frame_utils import (
+    latest_rows_by_primary_key,
+    normalize_existing_versioned_frame,
+    normalize_incoming_versioned_frame,
+    prepare_changed_versioned_row,
+    prepare_new_versioned_row,
+)
 
 
 class IncrementalByPrimaryKeyAndHashStrategy(BaseLoadStrategy):
@@ -22,15 +29,10 @@ class IncrementalByPrimaryKeyAndHashStrategy(BaseLoadStrategy):
         if self.hash_column not in incoming_df.columns:
             raise ValueError(f"Hash column '{self.hash_column}' not found in incoming data")
 
-        incoming = incoming_df.copy()
-        incoming["date_created"] = pd.to_datetime(incoming.get("date_created"), errors="coerce", utc=True)
-        incoming["date_loaded"] = pd.to_datetime(incoming.get("date_loaded"), errors="coerce", utc=True)
-        if "is_current" not in incoming.columns:
-            incoming["is_current"] = True
+        incoming = normalize_incoming_versioned_frame(incoming_df)
 
         if existing_df.empty:
-            incoming["date_created"] = incoming["date_created"].fillna(incoming["date_loaded"])
-            return incoming
+            return incoming.apply(prepare_new_versioned_row, axis=1)
 
         if self.primary_key not in existing_df.columns:
             raise ValueError(f"Primary key column '{self.primary_key}' not found in existing data")
@@ -39,18 +41,8 @@ class IncrementalByPrimaryKeyAndHashStrategy(BaseLoadStrategy):
                 f"Hash column '{self.hash_column}' not found in existing data. Run full load first."
             )
 
-        existing = existing_df.copy()
-        existing["date_created"] = pd.to_datetime(existing.get("date_created"), errors="coerce", utc=True)
-        existing["date_loaded"] = pd.to_datetime(existing.get("date_loaded"), errors="coerce", utc=True)
-
-        if "is_current" in existing.columns:
-            existing = existing[existing["is_current"] == True].copy()
-
-        existing_latest = (
-            existing.sort_values(by="date_loaded", ascending=True, na_position="last")
-            .dropna(subset=[self.primary_key])
-            .drop_duplicates(subset=[self.primary_key], keep="last")
-        )
+        existing = normalize_existing_versioned_frame(existing_df)
+        existing_latest = latest_rows_by_primary_key(existing, self.primary_key)
 
         existing_hash_map = existing_latest.set_index(self.primary_key)[self.hash_column].to_dict()
         existing_created_map = existing_latest.set_index(self.primary_key)["date_created"].to_dict()
@@ -61,20 +53,14 @@ class IncrementalByPrimaryKeyAndHashStrategy(BaseLoadStrategy):
             row_hash = row[self.hash_column]
 
             if key not in existing_hash_map:
-                row = row.copy()
-                row["date_created"] = row["date_created"] if pd.notna(row["date_created"]) else row["date_loaded"]
-                row["is_current"] = True
-                rows.append(row)
+                rows.append(prepare_new_versioned_row(row))
                 continue
 
             if existing_hash_map[key] == row_hash:
                 continue
 
-            row = row.copy()
             existing_created = existing_created_map.get(key)
-            row["date_created"] = existing_created if pd.notna(existing_created) else row["date_loaded"]
-            row["is_current"] = True
-            rows.append(row)
+            rows.append(prepare_changed_versioned_row(row, existing_created))
 
         if not rows:
             return incoming.iloc[0:0].copy()

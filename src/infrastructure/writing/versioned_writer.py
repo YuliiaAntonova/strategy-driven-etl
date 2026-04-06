@@ -3,20 +3,11 @@ from __future__ import annotations
 from pandas import DataFrame
 from sqlalchemy import text
 
-from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.writing.sql_writer_base import PrimaryKeyPostgresSQLWriter
 from src.infrastructure.writing.utils import quote_identifiers
 
 
-class VersionedWriteStrategy(BasePostgresSQLWriter):
-    def __init__(self, connector, table_name: str, primary_key: str):
-        super().__init__(
-            connector=connector,
-            table_name=table_name,
-            primary_key=primary_key,
-        )
-
-    def requires_primary_key(self) -> bool:
-        return True
+class VersionedWriteStrategy(PrimaryKeyPostgresSQLWriter):
 
     def _validate_input(self, df: DataFrame) -> None:
         super()._validate_input(df)

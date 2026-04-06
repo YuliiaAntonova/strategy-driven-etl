@@ -1,10 +1,9 @@
 from pandas import DataFrame
-from sqlalchemy import text, inspect
+from sqlalchemy import inspect, text
 
 from src.domain.contracts.loader import BaseLoader
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
-from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
-from src.infrastructure.utils.temp_table import stage_dataframe_to_temp
+from src.infrastructure.utils.postgres_staging import build_dtype_map, stage_dataframe
 from src.infrastructure.writing.utils import (
     build_versioned_dedup_cte,
     quote_identifiers,
@@ -23,8 +22,8 @@ class VersionedPostgresLoader(BaseLoader):
         self.primary_key = primary_key
         self.temp_table_name = f"{table_name}_temp"
 
-    def _dtype_map(self) -> dict:
-        return JOBS_DTYPE_MAP
+    def _dtype_map(self, df: DataFrame) -> dict:
+        return build_dtype_map(df)
 
     def load(self, df: DataFrame, chunk_size: int | None = None) -> None:
         if df.empty:
@@ -35,20 +34,18 @@ class VersionedPostgresLoader(BaseLoader):
             raise ValueError(f"Primary key column '{self.primary_key}' not found in dataframe")
 
         engine = self.connector.connect()
-        dtype_map = {k: v for k, v in self._dtype_map().items() if k in df.columns}
+        dtype_map = self._dtype_map(df)
 
-        # Always land the incoming batch into a staging table named {table_name}_temp.
-        stage_dataframe_to_temp(
+        stage_dataframe(
             df=df,
             engine=engine,
             temp_table_name=self.temp_table_name,
-            dtype_map=dtype_map,
+            chunk_size=chunk_size,
         )
 
         inspector = inspect(engine)
         target_exists = inspector.has_table(self.table_name)
 
-        # Initialize the target table on the first run.
         if not target_exists:
             df.to_sql(
                 name=self.table_name,

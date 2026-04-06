@@ -7,8 +7,7 @@ from sqlalchemy import inspect, text
 
 from src.domain.contracts.write_strategy import BaseWriteStrategy
 from src.domain.models.change_set import ChangeSet
-from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
-from src.infrastructure.utils.temp_table import stage_dataframe_to_temp
+from src.infrastructure.utils.postgres_staging import build_dtype_map, stage_dataframe
 
 
 class BasePostgresSQLWriter(BaseWriteStrategy):
@@ -55,18 +54,16 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
     def requires_primary_key(self) -> bool:
         return False
 
-    def _dtype_map(self) -> dict:
-        return JOBS_DTYPE_MAP
+    def _dtype_map(self, df: DataFrame) -> dict:
+        return build_dtype_map(df)
 
     def _stage_dataframe(self, df: DataFrame, chunk_size: int | None = None):
         engine = self.connector.connect()
-        dtype_map = {key: value for key, value in self._dtype_map().items() if key in df.columns}
-
-        stage_dataframe_to_temp(
+        dtype_map = self._dtype_map(df)
+        stage_dataframe(
             df=df,
             engine=engine,
             temp_table_name=self.temp_table_name,
-            dtype_map=dtype_map,
             chunk_size=chunk_size,
         )
         return engine, dtype_map
@@ -80,12 +77,48 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
 
     def _rename_temp_to_target(self, engine) -> None:
         with engine.begin() as conn:
-            conn.execute(
-                text(
-                    f'ALTER TABLE "{self.temp_table_name}" '
-                    f'RENAME TO "{self.table_name}"'
-                )
+            self._rename_table(conn, self.temp_table_name, self.table_name)
+
+    def _rename_table(self, conn, source_table_name: str, target_table_name: str) -> None:
+        conn.execute(
+            text(
+                f'ALTER TABLE "{source_table_name}" '
+                f'RENAME TO "{target_table_name}"'
             )
+        )
+
+    def _replace_target_with_staged(self, conn) -> None:
+        conn.execute(text(f'DROP TABLE IF EXISTS "{self.table_name}"'))
+        self._rename_table(conn, self.temp_table_name, self.table_name)
+
+    def _delete_duplicate_rows(self, conn, table_name: str) -> None:
+        if not self.primary_key:
+            return
+
+        conn.execute(
+            text(
+                f'''
+                DELETE FROM "{table_name}"
+                WHERE ctid NOT IN (
+                    SELECT MIN(ctid)
+                    FROM "{table_name}"
+                    GROUP BY "{self.primary_key}"
+                )
+                '''
+            )
+        )
+
+    def _ensure_unique_index(self, conn, table_name: str) -> None:
+        if not self.primary_key:
+            return
+
+        index_name = self._build_unique_index_name(table_name, self.primary_key)
+        conn.execute(
+            text(
+                f'CREATE UNIQUE INDEX IF NOT EXISTS "{index_name}" '
+                f'ON "{table_name}" ("{self.primary_key}")'
+            )
+        )
 
     def _build_unique_index_name(self, table_name: str, column_name: str) -> str:
         return f"ux_{table_name}_{column_name}"
@@ -100,3 +133,15 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
     @abstractmethod
     def _write_to_existing_target(self, engine, df: DataFrame) -> None:
         raise NotImplementedError
+
+
+class PrimaryKeyPostgresSQLWriter(BasePostgresSQLWriter):
+    def __init__(self, connector, table_name: str, primary_key: str):
+        super().__init__(
+            connector=connector,
+            table_name=table_name,
+            primary_key=primary_key,
+        )
+
+    def requires_primary_key(self) -> bool:
+        return True

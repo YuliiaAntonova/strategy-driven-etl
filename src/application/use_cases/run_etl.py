@@ -14,7 +14,7 @@ from src.config.settings import settings
 from src.domain.contracts.extractor import BaseExtractor
 from src.domain.contracts.transformer import BaseTransformer
 from src.domain.models.pipeline_context import PipelineContext
-from src.infrastructure.connectors.postgres import PostgreSQLConnector
+from src.infrastructure.connectors.factory import get_postgres_connector
 from src.infrastructure.extractors.csv import CSVExtractor
 from src.infrastructure.extractors.postgres import PostgresExtractor
 from src.infrastructure.transformers.composite import CompositeTransformer
@@ -80,13 +80,7 @@ def run_etl(
         environment=settings.environment,
     )
 
-    connector = connector or PostgreSQLConnector(
-        host=settings.postgres_host,
-        database=settings.postgres_db,
-        user=settings.postgres_user,
-        password=settings.postgres_password,
-        port=settings.postgres_port,
-    )
+    resolved_connector = get_postgres_connector(connector)
 
     extractor = extractor or CSVExtractor(file_path=str(source_path))
     transformer = transformer or CompositeTransformer(
@@ -101,7 +95,7 @@ def run_etl(
 
     def state_reader():
         target_extractor = PostgresExtractor(
-            connector=connector,
+            connector=resolved_connector,
             query=f"select * from {settings.target_table}",
         )
         try:
@@ -113,7 +107,7 @@ def run_etl(
     def writer_resolver(batch_index: int):
         writer_key = runtime_profile.initial_writer_key if batch_index == 0 else runtime_profile.subsequent_writer_key
         writer_factory = WRITER_FACTORIES[writer_key]
-        return writer_factory(connector, settings.target_table, primary_key)
+        return writer_factory(resolved_connector, settings.target_table, primary_key)
 
     pipeline = Pipeline(
         extractor=extractor,

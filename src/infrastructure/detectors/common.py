@@ -4,6 +4,13 @@ import pandas as pd
 from pandas import DataFrame
 
 from src.domain.models.change_set import ChangeSet
+from src.infrastructure.versioning.frame_utils import (
+    latest_rows_by_primary_key,
+    normalize_existing_versioned_frame,
+    normalize_incoming_versioned_frame,
+    prepare_changed_versioned_row,
+    prepare_new_versioned_row,
+)
 
 
 class BaseTabularChangeDetector:
@@ -24,42 +31,27 @@ class BaseTabularChangeDetector:
         if self.hash_column not in candidates_df.columns:
             raise ValueError(f"Hash column '{self.hash_column}' not found in incoming data")
 
-        incoming = candidates_df.copy()
-        incoming["date_created"] = pd.to_datetime(incoming.get("date_created"), errors="coerce", utc=True)
-        incoming["date_loaded"] = pd.to_datetime(incoming.get("date_loaded"), errors="coerce", utc=True)
-        if "is_current" not in incoming.columns:
-            incoming["is_current"] = True
+        incoming = normalize_incoming_versioned_frame(candidates_df)
 
         if existing_df.empty:
-            new_rows = incoming.copy()
-            new_rows["date_created"] = new_rows["date_created"].fillna(new_rows["date_loaded"])
-            new_rows["is_current"] = True
+            prepared_rows = incoming.apply(prepare_new_versioned_row, axis=1)
             return ChangeSet(
-                new_rows=new_rows.reset_index(drop=True),
+                new_rows=prepared_rows.reset_index(drop=True),
                 changed_rows=incoming.iloc[0:0].copy(),
                 unchanged_rows=incoming.iloc[0:0].copy(),
             )
 
-        existing = existing_df.copy()
-        existing["date_created"] = pd.to_datetime(existing.get("date_created"), errors="coerce", utc=True)
-        existing["date_loaded"] = pd.to_datetime(existing.get("date_loaded"), errors="coerce", utc=True)
-        if "is_current" in existing.columns:
-            existing = existing[existing["is_current"] == True].copy()
+        existing = normalize_existing_versioned_frame(existing_df)
 
         if self.primary_key not in existing.columns or self.hash_column not in existing.columns:
-            new_rows = incoming.copy()
-            new_rows["date_created"] = new_rows["date_created"].fillna(new_rows["date_loaded"])
-            new_rows["is_current"] = True
+            prepared_rows = incoming.apply(prepare_new_versioned_row, axis=1)
             return ChangeSet(
-                new_rows=new_rows.reset_index(drop=True),
+                new_rows=prepared_rows.reset_index(drop=True),
                 changed_rows=incoming.iloc[0:0].copy(),
                 unchanged_rows=incoming.iloc[0:0].copy(),
             )
 
-        existing_latest = existing.copy()
-        if "date_loaded" in existing_latest.columns:
-            existing_latest = existing_latest.sort_values(by="date_loaded", ascending=True, na_position="last")
-        existing_latest = existing_latest.dropna(subset=[self.primary_key]).drop_duplicates(subset=[self.primary_key], keep="last")
+        existing_latest = latest_rows_by_primary_key(existing, self.primary_key)
 
         existing_hash_map = existing_latest.set_index(self.primary_key)[self.hash_column].to_dict()
         existing_created_map = existing_latest.set_index(self.primary_key)["date_created"].to_dict() if "date_created" in existing_latest.columns else {}
@@ -74,21 +66,15 @@ class BaseTabularChangeDetector:
             current_hash = existing_hash_map.get(key)
 
             if current_hash is None:
-                new_row = row.copy()
-                new_row["date_created"] = new_row["date_created"] if pd.notna(new_row["date_created"]) else new_row["date_loaded"]
-                new_row["is_current"] = True
-                new_rows.append(new_row)
+                new_rows.append(prepare_new_versioned_row(row))
                 continue
 
             if current_hash == row_hash:
                 unchanged_rows.append(row.copy())
                 continue
 
-            changed_row = row.copy()
             existing_created = existing_created_map.get(key)
-            changed_row["date_created"] = existing_created if pd.notna(existing_created) else changed_row["date_loaded"]
-            changed_row["is_current"] = True
-            changed_rows.append(changed_row)
+            changed_rows.append(prepare_changed_versioned_row(row, existing_created))
 
         def _rows_to_df(rows: list) -> DataFrame:
             if not rows:

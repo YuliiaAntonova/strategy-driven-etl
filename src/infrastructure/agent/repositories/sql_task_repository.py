@@ -9,18 +9,13 @@ from sqlalchemy import text
 
 from src.config.settings import settings
 from src.domain.agent.contracts.task_repository import TaskRepository
+from src.infrastructure.connectors.factory import get_postgres_connector
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
 
 
 class SQLTaskRepository(TaskRepository):
     def __init__(self, connector: PostgreSQLConnector | None = None) -> None:
-        self.connector = connector or PostgreSQLConnector(
-            host=settings.postgres_host,
-            database=settings.postgres_db,
-            user=settings.postgres_user,
-            password=settings.postgres_password,
-            port=settings.postgres_port,
-        )
+        self.connector = get_postgres_connector(connector)
         self._engine = self.connector.get_engine()
         self._ensure_tables()
 
