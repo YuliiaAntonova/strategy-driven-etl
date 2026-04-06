@@ -1,10 +1,5 @@
-from src.application.use_cases.run_jobs_ingestion import run_jobs_ingestion
+from __future__ import annotations
 
+from src.application.api.main import app
 
-def trigger_jobs_ingestion(dataset: str = "jobs", dt: str | None = None, run_id: str | None = None) -> dict:
-    output_file = run_jobs_ingestion(dataset=dataset, dt=dt, run_id=run_id)
-    return {
-        "status": "ok",
-        "dataset": dataset,
-        "output_file": output_file,
-    }
+__all__ = ["app"]

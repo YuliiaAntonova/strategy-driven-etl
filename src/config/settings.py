@@ -46,6 +46,9 @@ class Settings:
     ai_answer_generator = os.getenv("AI_ANSWER_GENERATOR", "template")
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+    agent_task_table = os.getenv("AGENT_TASK_TABLE", "agent_tasks")
+    agent_task_step_table = os.getenv("AGENT_TASK_STEP_TABLE", "agent_task_steps")
     ai_document_columns = _split_csv(os.getenv(
         "AI_DOCUMENT_COLUMNS",
         "id,title,company,location,job_type,description,skills,date_posted,job_url",

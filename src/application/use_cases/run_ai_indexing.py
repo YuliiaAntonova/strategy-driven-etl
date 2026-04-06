@@ -12,7 +12,7 @@ from src.infrastructure.connectors.postgres import PostgreSQLConnector
 from src.infrastructure.extractors.postgres import PostgresExtractor
 
 
-def run_ai_indexing(profile: str | None = None, connector=None) -> None:
+def run_ai_indexing(profile: str | None = None, connector=None) -> dict[str, int | str]:
     profile_name = profile or settings.ai_default_profile
     ai_profile = AI_PROFILES[profile_name]
 
@@ -47,7 +47,13 @@ def run_ai_indexing(profile: str | None = None, connector=None) -> None:
         repository=repository,
     )
     documents_df, chunks_df = flow.run(jobs_df)
+    summary = {
+        "profile": profile_name,
+        "documents_count": int(len(documents_df)),
+        "chunks_count": int(len(chunks_df)),
+    }
     print(
-        f"AI indexing completed with {len(documents_df)} documents and {len(chunks_df)} chunks "
+        f"AI indexing completed with {summary['documents_count']} documents and {summary['chunks_count']} chunks "
         f"using profile '{profile_name}'"
     )
+    return summary

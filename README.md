@@ -146,8 +146,9 @@ src/
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -U pip
-python3 -m pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy
+python3 -m pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy fastapi uvicorn pydantic
 ```
+
 
 ## Environment
 
@@ -215,6 +216,13 @@ Behavior:
 
 ```bash
 python3 -m src.entrypoints.cli run-etl   --profile historized_snapshot   --primary-key id
+```
+```bash
+python3 -m src.entrypoints.cli run-etl \
+  --profile historized_snapshot \
+  --primary-key id \
+  --extract-chunk-size 10000 \
+  --write-chunk-size 5000
 ```
 
 Equivalent explicit command:
@@ -459,6 +467,10 @@ OPENAI_MODEL=gpt-4o-mini
 
 ## New AI commands
 
+```bash
+python3 -m uvicorn src.entrypoints.api:app --reload
+```
+
 ### Lightweight local RAG
 
 ```bash
@@ -493,3 +505,66 @@ This structure is intentionally ready for later additions without changing the c
 - hybrid retriever
 - OpenRouter answer generator
 - planner/executor orchestration layer on top of `ask-ai`
+
+
+## Agent API layer
+
+This project now also includes an agent-oriented orchestration layer:
+
+```text
+Client / UI
+  ↓
+FastAPI
+  ↓
+application/agent
+  ├─ planner
+  ├─ executor
+  ├─ tool_registry
+  └─ task_service
+  ↓
+application/use_cases
+  ├─ run_jobs_ingestion
+  ├─ run_etl
+  ├─ run_ai_indexing
+  └─ answer_query
+  ↓
+application/ai + existing ETL pipeline
+  ↓
+Postgres
+```
+
+### New API endpoints
+
+- `GET /health`
+- `POST /api/tasks`
+- `GET /api/tasks/{task_id}`
+- `GET /api/tasks/meta/tools`
+
+### Open the app
+
+- `UI: http://localhost:8000/`
+- `Docs: http://localhost:8000/docs`
+- 
+### Current endpoints:
+- 
+* GET /health
+* POST /api/tasks
+* GET /api/tasks/{task_id}
+* GET /docs
+
+### Example request
+
+```bash
+curl -X POST http://localhost:8000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "refresh data and rebuild index",
+    "dry_run": false
+  }'
+```
+
+### Run the API
+
+```bash
+uvicorn src.entrypoints.api:app --reload
+```
