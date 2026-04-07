@@ -1,3 +1,5 @@
+"""Replace write strategy for Postgres targets."""
+
 from __future__ import annotations
 
 from pandas import DataFrame
@@ -5,6 +7,8 @@ from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
 
 
 class ReplaceWriteStrategy(BasePostgresSQLWriter):
+    """Replaces the target table with the staged table contents."""
+
     def _initialize_target(self, engine, df: DataFrame) -> None:
         self._rename_temp_to_target(engine)
 

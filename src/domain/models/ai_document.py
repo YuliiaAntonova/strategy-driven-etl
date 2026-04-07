@@ -1,3 +1,5 @@
+"""Domain model representing a source document stored for AI/RAG workflows."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -5,6 +7,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class AIDocument:
+    """A document record that can be chunked/embedded and later retrieved."""
+
     document_id: str
     entity_id: str
     source_type: str

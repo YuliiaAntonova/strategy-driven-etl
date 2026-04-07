@@ -218,11 +218,8 @@ Behavior:
 python3 -m src.entrypoints.cli run-etl   --profile historized_snapshot   --primary-key id
 ```
 ```bash
-python3 -m src.entrypoints.cli run-etl \
-  --profile historized_snapshot \
-  --primary-key id \
-  --extract-chunk-size 10000 \
-  --write-chunk-size 5000
+
+
 ```
 
 Equivalent explicit command:

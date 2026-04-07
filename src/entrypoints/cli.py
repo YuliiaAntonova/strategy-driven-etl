@@ -1,3 +1,5 @@
+"""Command line interface entrypoint for local development and ops."""
+
 import argparse
 
 from src.application.ai.profiles import AI_PROFILES
@@ -11,11 +13,12 @@ from src.application.use_cases.run_jobs_ingestion import run_jobs_ingestion
 
 LOAD_MODES = tuple(DEFAULT_WRITE_MODE_BY_LOAD_MODE.keys())
 PROFILE_NAMES = tuple(PIPELINE_PROFILES.keys())
-WRITE_MODES = tuple(sorted({mode for mode in DEFAULT_WRITE_MODE_BY_LOAD_MODE.values()}))
+WRITE_MODES = tuple(sorted(set(DEFAULT_WRITE_MODE_BY_LOAD_MODE.values())))
 AI_PROFILE_NAMES = tuple(AI_PROFILES.keys())
 
 
 def main():
+    """Parse CLI arguments and dispatch to the selected use case."""
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -71,9 +74,22 @@ def main():
     elif args.command == "run-ai-indexing":
         run_ai_indexing(profile=args.profile)
     elif args.command == "answer-query":
-        print(answer_query(question=args.question, profile=args.profile, top_k=args.top_k))
+        print(
+            answer_query(
+                question=args.question,
+                profile=args.profile,
+                top_k=args.top_k,
+            )
+        )
     elif args.command == "ask-ai":
-        print(ask_ai(question=args.question, profile=args.profile, top_k=args.top_k, fetch_k=args.fetch_k))
+        print(
+            ask_ai(
+                question=args.question,
+                profile=args.profile,
+                top_k=args.top_k,
+                fetch_k=args.fetch_k,
+            )
+        )
 
 
 if __name__ == "__main__":

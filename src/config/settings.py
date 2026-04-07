@@ -1,3 +1,8 @@
+"""Application configuration.
+
+Settings are loaded from environment variables (optionally via a .env file).
+"""
+
 import os
 from dotenv import load_dotenv
 
@@ -9,6 +14,8 @@ def _split_csv(value: str) -> list[str]:
 
 
 class Settings:
+    """Container for application settings loaded from environment variables."""
+
     source_file = os.getenv("SOURCE_FILE", "data/jobs.csv")
 
     postgres_host = os.getenv("POSTGRES_HOST", "localhost")
@@ -23,7 +30,7 @@ class Settings:
 
     jobs_search_term = os.getenv("JOBS_SEARCH_TERM", "data engineer")
     jobs_location = os.getenv("JOBS_LOCATION", "Berlin")
-    jobs_results_wanted = int(os.getenv("JOBS_RESULTS_WANTED", "1000"))
+    jobs_results_wanted = int(os.getenv("JOBS_RESULTS_WANTED", "10"))
 
     source_name = os.getenv("SOURCE_NAME", "jobs_api")
     environment = os.getenv("ENVIRONMENT", "local")

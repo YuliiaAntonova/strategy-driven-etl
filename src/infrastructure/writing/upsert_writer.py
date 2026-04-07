@@ -1,3 +1,5 @@
+"""Upsert write strategy for Postgres targets."""
+
 from __future__ import annotations
 
 from pandas import DataFrame
@@ -8,6 +10,7 @@ from src.infrastructure.writing.utils import quote_identifiers
 
 
 class UpsertWriteStrategy(PrimaryKeyPostgresSQLWriter):
+    """Upserts staged rows into the target table using ON CONFLICT."""
 
     def _prepare_target_for_upsert(self, conn) -> None:
         self._delete_duplicate_rows(conn, self.table_name)

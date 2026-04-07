@@ -1,9 +1,16 @@
+"""Postgres loader for historized/versioned writes.
+
+This is a loader (not a writer) because it performs a domain-specific
+"versioned" merge into a target table using a staging temp table.
+"""
+
 from pandas import DataFrame
 from sqlalchemy import inspect, text
 
 from src.domain.contracts.loader import BaseLoader
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
-from src.infrastructure.utils.postgres_staging import build_dtype_map, stage_dataframe
+from src.infrastructure.utils.postgres_staging import build_dtype_map
+from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
 from src.infrastructure.writing.utils import (
     build_versioned_dedup_cte,
     quote_identifiers,
@@ -11,6 +18,8 @@ from src.infrastructure.writing.utils import (
 
 
 class VersionedPostgresLoader(BaseLoader):
+    """Load a dataframe into a Postgres table using historized semantics."""
+
     def __init__(
         self,
         connector: PostgreSQLConnector,
@@ -35,10 +44,9 @@ class VersionedPostgresLoader(BaseLoader):
 
         engine = self.connector.connect()
         dtype_map = self._dtype_map(df)
-
-        stage_dataframe(
-            df=df,
+        BasePostgresSQLWriter.stage_dataframe_to_table(
             engine=engine,
+            df=df,
             temp_table_name=self.temp_table_name,
             chunk_size=chunk_size,
         )

@@ -1,3 +1,9 @@
+"""Versioned (historized) write strategy for Postgres targets.
+
+Maintains a full history of changes by inserting new versions and marking
+previous versions as not current.
+"""
+
 from __future__ import annotations
 
 from pandas import DataFrame
@@ -8,6 +14,7 @@ from src.infrastructure.writing.utils import quote_identifiers
 
 
 class VersionedWriteStrategy(PrimaryKeyPostgresSQLWriter):
+    """Writes historized rows (SCD2-like) into the target table."""
 
     def _validate_input(self, df: DataFrame) -> None:
         super()._validate_input(df)

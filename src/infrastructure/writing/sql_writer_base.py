@@ -1,3 +1,5 @@
+"""Base classes and shared helpers for Postgres SQL write strategies."""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -11,6 +13,7 @@ from src.infrastructure.utils.postgres_staging import build_dtype_map, stage_dat
 
 
 class BasePostgresSQLWriter(BaseWriteStrategy):
+    """Base class for writers that stage dataframes and write into Postgres."""
     def __init__(
         self,
         connector,
@@ -52,17 +55,39 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
             )
 
     def requires_primary_key(self) -> bool:
+        """Whether this writer requires a primary key column in the input."""
         return False
 
     def _dtype_map(self, df: DataFrame) -> dict:
         return build_dtype_map(df)
 
-    def _stage_dataframe(self, df: DataFrame, chunk_size: int | None = None):
-        engine = self.connector.connect()
-        dtype_map = self._dtype_map(df)
+    @staticmethod
+    def stage_dataframe_to_table(
+        *,
+        engine,
+        df: DataFrame,
+        temp_table_name: str,
+        chunk_size: int | None = None,
+    ) -> None:
+        """Stage a dataframe into a Postgres temp table.
+
+        Centralized helper to prevent copy/paste of the staging call across
+        multiple writers/loaders.
+        """
+
         stage_dataframe(
             df=df,
             engine=engine,
+            temp_table_name=temp_table_name,
+            chunk_size=chunk_size,
+        )
+
+    def _stage_dataframe(self, df: DataFrame, chunk_size: int | None = None):
+        engine = self.connector.connect()
+        dtype_map = self._dtype_map(df)
+        self.stage_dataframe_to_table(
+            engine=engine,
+            df=df,
             temp_table_name=self.temp_table_name,
             chunk_size=chunk_size,
         )
@@ -136,6 +161,8 @@ class BasePostgresSQLWriter(BaseWriteStrategy):
 
 
 class PrimaryKeyPostgresSQLWriter(BasePostgresSQLWriter):
+    """Writer base that enforces the presence of a primary key in input data."""
+
     def __init__(self, connector, table_name: str, primary_key: str):
         super().__init__(
             connector=connector,

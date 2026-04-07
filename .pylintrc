@@ -1,0 +1,17 @@
+[MASTER]
+# Keep CLI output stable and avoid noise from generated/third-party code.
+ignore-patterns=^\.venv,^.*/\.venv,^.*/migrations
+
+[MESSAGES CONTROL]
+disable=
+    # NOTE: "too-few-public-methods" is not a useful signal for this project
+    # because many classes are intentionally thin (strategies, services, flows)
+    # and/or are interfaces (contracts). Keeping it enabled generates a large
+    # amount of noise and hides more actionable issues.
+    too-few-public-methods
+
+[FORMAT]
+max-line-length=100
+
+
+
