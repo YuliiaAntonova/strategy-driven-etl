@@ -1,3 +1,8 @@
+"""Jobs-specific transformations.
+
+Adds audit columns (run metadata & timestamps) and ensures a stable job ID.
+"""
+
 from datetime import datetime, timezone
 import hashlib
 
@@ -8,6 +13,8 @@ from src.domain.models.pipeline_context import PipelineContext
 
 
 class JobsAuditTransformer(BaseTransformer):
+    """Add audit columns and a stable identifier for job rows."""
+
     def __init__(self, context: PipelineContext, source_name: str):
         self.context = context
         self.source_name = source_name
@@ -30,6 +37,7 @@ class JobsAuditTransformer(BaseTransformer):
         return hashlib.md5(raw_key.encode("utf-8")).hexdigest()
 
     def transform(self, df: DataFrame) -> DataFrame:
+        """Return a copy of `df` with audit fields added."""
         result = df.copy()
         now = datetime.now(timezone.utc)
 

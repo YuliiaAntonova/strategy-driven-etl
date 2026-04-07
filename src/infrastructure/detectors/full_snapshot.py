@@ -1,3 +1,8 @@
+"""Change detector for full snapshot loads.
+
+Treats every incoming row as new. Useful for full-refresh pipelines.
+"""
+
 from __future__ import annotations
 
 from pandas import DataFrame
@@ -8,6 +13,8 @@ from src.infrastructure.detectors.common import BaseTabularChangeDetector
 
 
 class FullSnapshotDetector(BaseTabularChangeDetector, BaseChangeDetector):
+    """Detector that marks all incoming rows as new."""
+
     def detect(self, incoming_df: DataFrame, existing_df: DataFrame) -> ChangeSet:
         if incoming_df.empty:
             return ChangeSet.empty_like(incoming_df)

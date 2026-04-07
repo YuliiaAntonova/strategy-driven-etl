@@ -1,3 +1,8 @@
+"""Recursive text chunker.
+
+Splits a document into overlapping fixed-size chunks.
+"""
+
 from __future__ import annotations
 
 from src.domain.contracts.chunker import BaseChunker
@@ -6,6 +11,8 @@ from src.domain.models.chunk import Chunk
 
 
 class RecursiveTextChunker(BaseChunker):
+    """Chunk documents into overlapping slices of approximately `chunk_size`."""
+
     def __init__(self, chunk_size: int = 900, chunk_overlap: int = 120):
         if chunk_overlap >= chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size")

@@ -2,6 +2,17 @@
 # Keep CLI output stable and avoid noise from generated/third-party code.
 ignore-patterns=^\.venv,^.*/\.venv,^.*/migrations
 
+# Make pylint resilient when invoked outside the activated virtualenv.
+# Pylint performs imports using the interpreter it is executed with; if that
+# interpreter does not have project deps installed, it may raise E0401.
+# This hook adds the local project's `.venv` site-packages (if present).
+init-hook=
+    import os, site; venv = os.path.join(os.getcwd(), '.venv');
+    sp = os.path.join(venv, 'lib');
+    candidates = [];
+    candidates.extend([os.path.join(sp, d, 'site-packages') for d in os.listdir(sp)]) if os.path.isdir(sp) else None;
+    [site.addsitedir(p) for p in candidates if os.path.isdir(p)]
+
 [MESSAGES CONTROL]
 disable=
     # NOTE: "too-few-public-methods" is not a useful signal for this project

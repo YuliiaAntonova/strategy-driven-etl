@@ -1,9 +1,18 @@
+"""Incremental load strategy that filters out rows already present by primary key.
+
+This strategy is useful for append-only targets where updates are not expected.
+It keeps only records whose `primary_key` value is not found in the existing
+dataset.
+"""
+
 from pandas import DataFrame
 
 from src.domain.contracts.load_strategy import BaseLoadStrategy
 
 
 class IncrementalByPrimaryKeyStrategy(BaseLoadStrategy):
+    """Keep only new records by primary key (no updates)."""
+
     def __init__(self, primary_key: str):
         self.primary_key = primary_key
 

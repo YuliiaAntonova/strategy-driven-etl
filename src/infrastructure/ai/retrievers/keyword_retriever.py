@@ -1,3 +1,9 @@
+"""Simple keyword-based retriever.
+
+Scores chunks by token overlap with the query. Intended as a lightweight
+baseline retriever without vector search.
+"""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +16,8 @@ from src.domain.models.retrieval_result import RetrievalResult
 
 
 class KeywordRetriever(BaseRetriever):
+    """Retrieve top-k chunks using keyword overlap scoring."""
+
     def retrieve(self, query: str, chunks_df: DataFrame, top_k: int) -> list[RetrievalResult]:
         if chunks_df.empty:
             return []
@@ -38,7 +46,11 @@ class KeywordRetriever(BaseRetriever):
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:
-        return {token for token in re.findall(r"[a-zA-Z0-9_]+", text.lower()) if token}
+        return {
+            token
+            for token in re.findall(r"[a-zA-Z0-9_]+", text.lower())
+            if token
+        }
 
     @staticmethod
     def _score(query_tokens: set[str], content_tokens: set[str]) -> float:

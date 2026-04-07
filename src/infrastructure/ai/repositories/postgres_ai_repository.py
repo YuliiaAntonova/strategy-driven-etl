@@ -1,14 +1,25 @@
+"""Postgres-backed repository for AI documents and chunks."""
+
 from __future__ import annotations
 
 import pandas as pd
 from pandas import DataFrame
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.domain.contracts.ai_repository import BaseAIRepository
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
 
 
 class PostgresAIRepository(BaseAIRepository):
-    def __init__(self, connector: PostgreSQLConnector, document_table: str, chunk_table: str):
+    """Persist and load AI indexing tables in Postgres."""
+
+    def __init__(
+        self,
+        connector: PostgreSQLConnector,
+        document_table: str,
+        chunk_table: str,
+    ):
         self.connector = connector
         self.document_table = document_table
         self.chunk_table = chunk_table
@@ -30,9 +41,21 @@ class PostgresAIRepository(BaseAIRepository):
         )
 
     def read_chunks(self) -> DataFrame:
+        """Read all chunks; return empty frame if the table doesn't exist yet."""
         try:
-            return pd.read_sql(f"select * from {self.chunk_table}", con=self.connector.connect())
-        except Exception:
-            return pd.DataFrame(columns=[
-                "chunk_id", "document_id", "entity_id", "position", "content", "metadata_json", "embedding_json"
-            ])
+            return pd.read_sql(
+                f"select * from {self.chunk_table}",
+                con=self.connector.connect(),
+            )
+        except (SQLAlchemyError, pd.errors.DatabaseError, ValueError):
+            return pd.DataFrame(
+                columns=[
+                    "chunk_id",
+                    "document_id",
+                    "entity_id",
+                    "position",
+                    "content",
+                    "metadata_json",
+                    "embedding_json",
+                ]
+            )

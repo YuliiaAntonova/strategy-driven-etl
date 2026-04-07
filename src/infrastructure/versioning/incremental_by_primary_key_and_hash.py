@@ -1,4 +1,16 @@
-import pandas as pd
+"""Incremental load strategy using primary key + row hash.
+
+This strategy implements historized/versioned semantics for a business entity:
+
+- If a primary key is new: emit a new current version.
+- If the primary key exists and the hash did not change: emit nothing.
+- If the primary key exists and the hash changed: emit a new version row while
+  preserving the original `date_created`.
+
+The downstream writer/loader is responsible for closing previous versions and
+inserting the new rows.
+"""
+
 from pandas import DataFrame
 
 from src.domain.contracts.load_strategy import BaseLoadStrategy
@@ -12,6 +24,8 @@ from src.infrastructure.versioning.frame_utils import (
 
 
 class IncrementalByPrimaryKeyAndHashStrategy(BaseLoadStrategy):
+    """Prepare rows to write for versioned tables based on PK + hash changes."""
+
     def __init__(self, primary_key: str, hash_column: str = "row_hash"):
         self.primary_key = primary_key
         self.hash_column = hash_column
