@@ -9,8 +9,7 @@ from sqlalchemy import inspect, text
 
 from src.domain.contracts.loader import BaseLoader
 from src.infrastructure.connectors.postgres import PostgreSQLConnector
-from src.infrastructure.utils.postgres_staging import build_dtype_map
-from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.utils.postgres_staging import build_dtype_map, stage_dataframe
 from src.infrastructure.writing.utils import (
     build_versioned_dedup_cte,
     quote_identifiers,
@@ -34,6 +33,83 @@ class VersionedPostgresLoader(BaseLoader):
     def _dtype_map(self, df: DataFrame) -> dict:
         return build_dtype_map(df)
 
+    def _stage(self, df: DataFrame, chunk_size: int | None) -> tuple:
+        engine = self.connector.connect()
+        dtype_map = self._dtype_map(df)
+        # Keep staging logic centralized (also used by SQL writers) to avoid
+        # copy/paste and schema drift.
+        stage_dataframe(
+            df=df,
+            engine=engine,
+            temp_table_name=self.temp_table_name,
+            chunk_size=chunk_size,
+        )
+        return engine, dtype_map
+
+    def _initialize_target_from_dataframe(self, engine, df: DataFrame, dtype_map: dict) -> None:
+        df.to_sql(
+            name=self.table_name,
+            con=engine,
+            if_exists="replace",
+            index=False,
+            dtype=dtype_map,
+        )
+        with engine.begin() as conn:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{self.temp_table_name}"'))
+        print(f"Initialized '{self.table_name}' from staging table '{self.temp_table_name}'")
+        print(f"Loaded {len(df)} versioned rows into table '{self.table_name}'")
+
+    def _build_select_columns(self, df: DataFrame) -> list[str]:
+        select_columns: list[str] = []
+        for column in df.columns:
+            if column == "date_created":
+                select_columns.append(
+                    'COALESCE(lt."date_created", s."date_created") AS "date_created"'
+                )
+            else:
+                select_columns.append(f's."{column}"')
+        return select_columns
+
+    def _build_dedup_staging_cte(self) -> str:
+        return build_versioned_dedup_cte(
+            temp_table_name=self.temp_table_name,
+            target_table_name=self.table_name,
+            primary_key=self.primary_key,
+            only_current=False,
+        )
+
+    def _build_update_and_insert_sql(self, df: DataFrame) -> tuple:
+        quoted_columns = quote_identifiers(df.columns)
+        select_columns = self._build_select_columns(df)
+        dedup_staging_cte = self._build_dedup_staging_cte()
+
+        update_sql = text(
+            dedup_staging_cte
+            + f"""
+            UPDATE \"{self.table_name}\" t
+            SET \"is_current\" = false
+            FROM staged s
+            WHERE t.\"{self.primary_key}\" = s.\"{self.primary_key}\"
+              AND t.\"is_current\" = true
+              AND COALESCE(t.\"row_hash\", '') <> COALESCE(s.\"row_hash\", '')
+            """
+        )
+
+        insert_sql = text(
+            dedup_staging_cte
+            + f"""
+            INSERT INTO \"{self.table_name}\" ({", ".join(quoted_columns)})
+            SELECT {", ".join(select_columns)}
+            FROM staged s
+            LEFT JOIN latest_target lt
+              ON lt.\"{self.primary_key}\" = s.\"{self.primary_key}\"
+            WHERE lt.\"{self.primary_key}\" IS NULL
+               OR COALESCE(lt.\"row_hash\", '') <> COALESCE(s.\"row_hash\", '')
+            """
+        )
+
+        return update_sql, insert_sql
+
     def load(self, df: DataFrame, chunk_size: int | None = None) -> None:
         if df.empty:
             print("No rows to load")
@@ -42,71 +118,16 @@ class VersionedPostgresLoader(BaseLoader):
         if self.primary_key not in df.columns:
             raise ValueError(f"Primary key column '{self.primary_key}' not found in dataframe")
 
-        engine = self.connector.connect()
-        dtype_map = self._dtype_map(df)
-        BasePostgresSQLWriter.stage_dataframe_to_table(
-            engine=engine,
-            df=df,
-            temp_table_name=self.temp_table_name,
-            chunk_size=chunk_size,
-        )
+        engine, dtype_map = self._stage(df, chunk_size)
 
         inspector = inspect(engine)
         target_exists = inspector.has_table(self.table_name)
 
         if not target_exists:
-            df.to_sql(
-                name=self.table_name,
-                con=engine,
-                if_exists="replace",
-                index=False,
-                dtype=dtype_map,
-            )
-            with engine.begin() as conn:
-                conn.execute(text(f'DROP TABLE IF EXISTS "{self.temp_table_name}"'))
-            print(f"Initialized '{self.table_name}' from staging table '{self.temp_table_name}'")
-            print(f"Loaded {len(df)} versioned rows into table '{self.table_name}'")
+            self._initialize_target_from_dataframe(engine, df, dtype_map)
             return
 
-        quoted_columns = quote_identifiers(df.columns)
-        select_columns = []
-        for column in df.columns:
-            if column == "date_created":
-                select_columns.append('COALESCE(lt."date_created", s."date_created") AS "date_created"')
-            else:
-                select_columns.append(f's."{column}"')
-
-        dedup_staging_cte = build_versioned_dedup_cte(
-            temp_table_name=self.temp_table_name,
-            target_table_name=self.table_name,
-            primary_key=self.primary_key,
-            only_current=False,
-        )
-
-        update_sql = text(
-            dedup_staging_cte
-            + f"""
-            UPDATE "{self.table_name}" t
-            SET "is_current" = false
-            FROM staged s
-            WHERE t."{self.primary_key}" = s."{self.primary_key}"
-              AND t."is_current" = true
-              AND COALESCE(t."row_hash", '') <> COALESCE(s."row_hash", '')
-            """
-        )
-
-        insert_sql = text(
-            dedup_staging_cte
-            + f"""
-            INSERT INTO "{self.table_name}" ({", ".join(quoted_columns)})
-            SELECT {", ".join(select_columns)}
-            FROM staged s
-            LEFT JOIN latest_target lt
-              ON lt."{self.primary_key}" = s."{self.primary_key}"
-            WHERE lt."{self.primary_key}" IS NULL
-               OR COALESCE(lt."row_hash", '') <> COALESCE(s."row_hash", '')
-            """
-        )
+        update_sql, insert_sql = self._build_update_and_insert_sql(df)
 
         with engine.begin() as conn:
             updated_result = conn.execute(update_sql)

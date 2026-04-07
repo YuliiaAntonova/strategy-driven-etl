@@ -1,3 +1,5 @@
+"""Loader that uploads a dataframe as CSV into S3."""
+
 from io import StringIO
 
 import pandas as pd
@@ -7,6 +9,8 @@ from src.infrastructure.connectors.s3 import S3Connector
 
 
 class S3CsvLoader(BaseLoader):
+    """Upload dataframe rows to S3 as a UTF-8 CSV object."""
+
     def __init__(self, connector: S3Connector, key: str):
         self.connector = connector
         self.key = key

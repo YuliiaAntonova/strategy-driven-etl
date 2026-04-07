@@ -1,3 +1,5 @@
+"""Loader that writes a dataframe to a CSV file."""
+
 from pathlib import Path
 
 from pandas import DataFrame
@@ -6,6 +8,8 @@ from src.domain.contracts.loader import BaseLoader
 
 
 class CSVLoader(BaseLoader):
+    """Save a dataframe as a CSV file (local filesystem)."""
+
     def __init__(self, file_path: str):
         self.file_path = file_path
 

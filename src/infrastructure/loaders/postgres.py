@@ -1,3 +1,5 @@
+"""Loader that writes a dataframe into Postgres using pandas.to_sql."""
+
 from pandas import DataFrame
 
 from src.domain.contracts.loader import BaseLoader
@@ -6,6 +8,8 @@ from src.infrastructure.utils.jobs_dtype import JOBS_DTYPE_MAP
 
 
 class PostgresLoader(BaseLoader):
+    """Load a dataframe into a Postgres table."""
+
     def __init__(self, connector: PostgreSQLConnector, table_name: str, if_exists: str = "replace"):
         self.connector = connector
         self.table_name = table_name
