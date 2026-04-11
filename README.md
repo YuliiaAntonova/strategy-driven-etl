@@ -146,7 +146,7 @@ src/
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -U pip
-python3 -m pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy fastapi uvicorn pydantic
+python3 -m pip install pandas sqlalchemy psycopg2-binary python-dotenv python-jobspy fastapi uvicorn pydantic dotenv
 ```
 
 
@@ -565,3 +565,7 @@ curl -X POST http://localhost:8000/api/tasks \
 ```bash
 uvicorn src.entrypoints.api:app --reload
 ```
+
+cd frontend                             
+npm install
+npm run dev

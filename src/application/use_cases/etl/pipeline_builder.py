@@ -32,10 +32,12 @@ class EtlOverrides:
         connector=None,
         extractor: BaseExtractor | None = None,
         transformer: BaseTransformer | None = None,
+        target_table: str | None = None,
     ):
         self.connector = connector
         self.extractor = extractor
         self.transformer = transformer
+        self.target_table = target_table
 
 
 class EtlPipelineBuilder:
@@ -102,7 +104,7 @@ class EtlPipelineBuilder:
         def _state_reader() -> DataFrame:
             target_extractor = PostgresExtractor(
                 connector=resolved_connector,
-                query=f"select * from {settings.target_table}",
+                query=f"select * from {self._overrides.target_table or settings.target_table}",
             )
             try:
                 return target_extractor.extract()
@@ -121,7 +123,7 @@ class EtlPipelineBuilder:
                 else self._runtime_profile.subsequent_writer_key
             )
             writer_factory = WRITER_FACTORIES[writer_key]
-            return writer_factory(resolved_connector, settings.target_table, primary_key)
+            return writer_factory(resolved_connector, self._overrides.target_table or settings.target_table, primary_key)
 
         return _writer_resolver
 
