@@ -29,7 +29,6 @@ def run_etl(
     transformer: BaseTransformer | None = None,
     profile: str | None = None,
     connector=None,
-    target_table: str | None = None,
 ) -> None:
     """Execute the ETL pipeline according to CLI-configured parameters."""
     source_path = Path(settings.source_file)
@@ -58,7 +57,6 @@ def run_etl(
             connector=connector,
             extractor=extractor,
             transformer=transformer,
-            target_table=target_table,
         ),
     ).build(config)
 
