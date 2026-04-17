@@ -1,21 +1,17 @@
-from snowflake.connector import connect
-from src.domain.contracts.connector import BaseConnector
+"""Snowflake connector.
 
-class SnowflakeConnector(BaseConnector):
-    def __init__(self, account, user, password, warehouse, database, schema):
-        self.account = account
-        self.user = user
-        self.password = password
-        self.warehouse = warehouse
-        self.database = database
-        self.schema = schema
+This ETL-only template does not ship Snowflake support by default.
 
-    def connect(self):
-        return connect(
-            account=self.account,
-            user=self.user,
-            password=self.password,
-            warehouse=self.warehouse,
-            database=self.database,
-            schema=self.schema,
+If you need Snowflake later, re-introduce a real implementation here and add
+the appropriate dependency (for example `snowflake-connector-python`).
+"""
+
+from __future__ import annotations
+
+
+class SnowflakeConnector:  # pragma: no cover
+    def __init__(self, *args, **kwargs):
+        raise ImportError(
+            "Snowflake support is not included in this ETL-only project. "
+            "Add the Snowflake dependency and implement SnowflakeConnector."
         )

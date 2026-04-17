@@ -19,7 +19,7 @@ class PostgreSQLConnector(BaseConnector):
         self.port = port
         self._engine = create_engine(
             (
-                f"postgresql+psycopg2://{self.user}:{self.password}"
+                f"postgresql://{self.user}:{self.password}"
                 f"@{self.host}:{self.port}/{self.database}"
             )
         )

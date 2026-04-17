@@ -5,13 +5,9 @@ description = "Refactored ETL template"
 requires-python = ">=3.11"
 dependencies = [
   "pandas>=2.2.0",
-  "psycopg2-binary>=2.9.9",
   "python-dotenv>=1.0.1",
   "sqlalchemy>=2.0.0",
   "python-jobspy>=1.1.80",
-  "openai>=1.51.0",
-  "uvicorn>=0.30.0",
-  "fastapi>=0.115.0",
 ]
 
 [build-system]
