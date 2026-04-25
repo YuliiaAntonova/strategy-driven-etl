@@ -39,3 +39,9 @@ class JobsApiExtractor(BaseExtractor):
             results_wanted=self.results_wanted,
         )
         return jobs
+
+    def extract_in_chunks(self, chunk_size: int):
+        df = self.extract()
+
+        for start in range(0, len(df), chunk_size):
+            yield df.iloc[start:start + chunk_size]
