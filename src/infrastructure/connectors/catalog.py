@@ -1,3 +1,4 @@
+from src.infrastructure.connectors.impl.bigquery.factory import BigQueryConnectorFactory
 from src.infrastructure.connectors.impl.csv.factory import CsvConnectorFactory
 from src.infrastructure.connectors.impl.jobs_api.factory import JobsApiConnectorFactory
 from src.infrastructure.connectors.impl.memory.factory import MemoryConnectorFactory
@@ -12,4 +13,5 @@ CONNECTOR_FACTORIES = {
     "memory": MemoryConnectorFactory(),
     "postgres": PostgresConnectorFactory(),
     "snowflake": SnowflakeConnectorFactory(),
+    "bigquery": BigQueryConnectorFactory(),
 }

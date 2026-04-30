@@ -5,6 +5,7 @@
 1. Implement `BaseConnectorFactory` under `src/infrastructure/connectors/impl/<name>/factory.py`
    (`create_extractor` / `create_loader`, `ConnectorCapabilities`).
 2. Register the factory instance in `src/infrastructure/connectors/catalog.py` (`CONNECTOR_FACTORIES`).
+3. Backends with extra drivers (e.g. BigQuery): install option group ``pip install -e ".[bigquery]"``.
 
 Connection YAML profiles live in `config/connectors.yml`.
 

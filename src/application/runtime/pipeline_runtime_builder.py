@@ -58,6 +58,8 @@ class PipelineRuntimeBuilder:
             transformer=transformer,
             target_table=spec.destination.config["table"],
             destination_type=spec.destination.type,
+            destination_credentials=dest_creds,
+            destination_config=spec.destination.config,
         )
 
         writer_resolver = self._build_writer_resolver(
@@ -85,6 +87,8 @@ class PipelineRuntimeBuilder:
         transformer,
         target_table: str,
         destination_type: str,
+        destination_credentials: dict | None = None,
+        destination_config: dict | None = None,
     ) -> Callable[[], DataFrame]:
         def _state_reader() -> DataFrame:
             target_extractor = SQLExtractor(
@@ -92,6 +96,8 @@ class PipelineRuntimeBuilder:
                 query=select_star_from_single_table(
                     destination_type=destination_type,
                     table_name=target_table,
+                    destination_credentials=destination_credentials,
+                    destination_config=destination_config,
                 ),
             )
 

@@ -1,0 +1,44 @@
+# Sample BigQuery profiles (Snowflake-like explicit credentials).
+# Copy snippets into config/connectors.yml after: pip install -e ".[bigquery]"
+#
+# Required IAM: BigQuery Data Editor / Job User on the project + dataset access.
+
+connectors:
+  bigquery_dev:
+    type: bigquery
+    roles: [extractor, loader]
+    credentials:
+      project_id: ${GCP_PROJECT_ID}
+      dataset: ${BQ_DATASET}
+      location: ${BQ_LOCATION:US}
+      credentials_path: ${GOOGLE_APPLICATION_CREDENTIALS}
+    config:
+      # Logical table id within credentials.dataset (merged at runtime with options.table_name / pipeline destination_config).
+      table: my_target_table
+
+      # Optional: physical fully-qualified table id if target differs from project_id.credentials.dataset.table.
+      # State reads + MERGE target then use this id (staging tables still live under credentials.dataset).
+      # table_reference: my-project.analytics.my_target_table
+
+      # Optional: partitioning / clustering.
+      # When require_existing_table is false (default), the first batch creates the table via the
+      # BigQuery API if missing (TIMESTAMP partition_field must be datetime64 in the dataframe).
+      # Replace loads use TRUNCATE + append so existing DDL is preserved.
+      # When require_existing_table is true, you manage DDL only in BigQuery (Console/sql).
+      # partition_field: event_date
+      # cluster_fields:
+      #   - country_code
+      #   - user_id
+      # require_existing_table: true
+
+  bigquery_events_source:
+    type: bigquery
+    roles: [extractor]
+    resource_name: events
+    credentials:
+      project_id: ${GCP_PROJECT_ID}
+      dataset: ${BQ_SOURCE_DATASET}
+      location: ${BQ_LOCATION:US}
+      credentials_path: ${GOOGLE_APPLICATION_CREDENTIALS}
+    config:
+      query: SELECT * FROM `my-project.my_dataset.events` LIMIT 100000

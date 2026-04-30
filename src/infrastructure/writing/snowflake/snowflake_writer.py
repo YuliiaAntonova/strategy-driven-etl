@@ -3,8 +3,8 @@ from __future__ import annotations
 from pandas import DataFrame
 from sqlalchemy import text
 
-from src.infrastructure.writing.staged_sql_writer import StagedSqlTableWriter
-from src.infrastructure.writing.utils import quote_identifiers
+from src.infrastructure.writing.shared.staged_sql_writer import StagedSqlTableWriter
+from src.infrastructure.writing.shared.utils import quote_identifiers
 
 
 class SnowflakeBaseWriteStrategy(StagedSqlTableWriter):

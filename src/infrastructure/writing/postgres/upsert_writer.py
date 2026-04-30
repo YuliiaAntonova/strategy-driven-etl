@@ -5,8 +5,8 @@ from __future__ import annotations
 from pandas import DataFrame
 from sqlalchemy import text
 
-from src.infrastructure.writing.sql_writer_base import PrimaryKeyPostgresSQLWriter
-from src.infrastructure.writing.utils import quote_identifiers
+from src.infrastructure.writing.postgres.sql_writer_base import PrimaryKeyPostgresSQLWriter
+from src.infrastructure.writing.shared.utils import quote_identifiers
 
 
 class UpsertWriteStrategy(PrimaryKeyPostgresSQLWriter):

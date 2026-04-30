@@ -9,6 +9,8 @@ class ConnectionSpec:
     type: str
     credentials: dict[str, Any] = field(default_factory=dict)
     config: dict[str, Any] = field(default_factory=dict)
+    # For bigquery destinations (merged YAML), optional: table_reference, partition_field,
+    # cluster_fields, require_existing_table — see BigQueryConnector (auto DDL when partition/cluster set).
 
 
 @dataclass(frozen=True)

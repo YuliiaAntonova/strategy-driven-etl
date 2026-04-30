@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pandas import DataFrame
-from src.infrastructure.writing.sql_writer_base import BasePostgresSQLWriter
+from src.infrastructure.writing.postgres.sql_writer_base import BasePostgresSQLWriter
 
 
 class ReplaceWriteStrategy(BasePostgresSQLWriter):

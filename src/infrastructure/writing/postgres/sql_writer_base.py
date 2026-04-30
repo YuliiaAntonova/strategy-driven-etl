@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from src.domain.contracts.write_strategy import BaseWriteStrategy
-from src.infrastructure.writing.staged_sql_writer import StagedSqlTableWriter
+from src.infrastructure.writing.shared.staged_sql_writer import StagedSqlTableWriter
 
 
 class BasePostgresSQLWriter(StagedSqlTableWriter):
