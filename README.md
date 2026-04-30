@@ -19,23 +19,25 @@ p.run()
 
 ## Configuration
 
-All logic is defined in:
+All profile-driven behavior is defined in:
 
 ```text
 config/
-  sources.yml
-  destinations.yml
-  options.yml
+  connectors.yml   # source & destination connector profiles (single file)
+  options.yml        # dataset name, load behavior, runtime (chunks, etc.)
 ```
+
+### connectors.yml
+
+Use one profile per named source or destination. Optional ``roles: [extractor, loader]`` documents intent; the runtime selects ``create_extractor`` / ``create_loader`` by connector type.
 
 ## Features
 
 - dynamic sources (API, CSV, Snowflake)
 - dynamic destinations (Postgres, etc.)
-- full refresh and historized snapshot (SCD2)
+- full refresh, historized snapshot (SCD2), incremental upsert (Postgres)
 - chunked processing
 - hash-based change detection
-- generated IDs
 - SOLID architecture
 
 ## Install

@@ -1,3 +1,3 @@
-from src.sdk import pipeline, resource, source
+from src.sdk import PipelineBootstrapConfig, pipeline, resource, source
 
-__all__ = ["pipeline", "resource", "source"]
+__all__ = ["pipeline", "resource", "source", "PipelineBootstrapConfig"]

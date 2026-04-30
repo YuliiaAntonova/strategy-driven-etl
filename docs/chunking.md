@@ -1,11 +1,12 @@
 # Chunking
 
+Чанки задаются только числовыми полями в `runtime` (код не читает флаги вида `use_chunks`):
+
 ```yaml
 runtime:
-  use_chunks: true
-  extract_chunk_size: 1000
-  write_chunk_size: 500
+  extract_chunk_size: 1000   # опционально; сколько строк за один проход extract
+  write_chunk_size: 500       # опционально; размер чанка при записи в БД
 ```
 
-- extraction happens in batches
-- writing happens in chunks
+- при заданном `extract_chunk_size` экстрактор с `extract_in_chunks` отдаёт несколько батчей за один `run()`;
+- `write_chunk_size` пробрасывается в writer при записи.

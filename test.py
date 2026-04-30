@@ -1,5 +1,4 @@
-from src import pipeline
-
+from src.sdk.pipeline_api import pipeline
 
 p = pipeline(
     pipeline_name="jobs_pipeline",

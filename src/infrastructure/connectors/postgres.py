@@ -26,6 +26,3 @@ class PostgreSQLConnector(BaseConnector):
 
     def connect(self):
         return self._engine
-
-    def get_engine(self):
-        return self._engine

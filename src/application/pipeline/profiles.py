@@ -27,20 +27,12 @@ PIPELINE_PROFILES: dict[str, PipelineProfile] = {
         subsequent_writer_key="versioned",
         requires_primary_key=True,
     ),
-}
-
-DEFAULT_WRITE_MODE_BY_LOAD_MODE = {
-    "full": "replace",
-    "incremental-by-date": "versioned",
-    "incremental-by-primary-key": "versioned",
-    "incremental-by-hash": "versioned",
-    "incremental-by-primary-key-and-hash": "versioned",
-}
-
-ALLOWED_WRITERS_BY_LOAD_MODE = {
-    "full": {"replace"},
-    "incremental-by-date": {"versioned"},
-    "incremental-by-primary-key": {"versioned"},
-    "incremental-by-hash": {"versioned"},
-    "incremental-by-primary-key-and-hash": {"versioned"},
+    # Incremental new rows by PK, merge conflicts with Postgres ON CONFLICT upsert.
+    "incremental_upsert": PipelineProfile(
+        name="incremental_upsert",
+        detector_key="incremental-by-primary-key",
+        initial_writer_key="upsert",
+        subsequent_writer_key="upsert",
+        requires_primary_key=True,
+    ),
 }

@@ -19,6 +19,13 @@ class TransformSpec:
 
 @dataclass(frozen=True)
 class LoadBehaviorSpec:
+    """Subset of YAML ``load_behavior`` that the pipeline runtime reads.
+
+    Fields: ``profile``, ``primary_key``, ``date_column``, ``hash_column``,
+    ``hash_columns``. Additional keys under ``load_behavior`` are ignored unless you
+    extend the spec builder.
+    """
+
     profile: str = "historized_snapshot"
     primary_key: str | None = None
     date_column: str = "date_loaded"

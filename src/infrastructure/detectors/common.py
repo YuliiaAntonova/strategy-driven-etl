@@ -9,7 +9,7 @@ from __future__ import annotations
 from pandas import DataFrame
 
 from src.domain.models.change_set import ChangeSet
-from src.infrastructure.versioning.frame_utils import (
+from src.infrastructure.detectors.frame_utils import (
     latest_rows_by_primary_key,
     normalize_existing_versioned_frame,
     normalize_incoming_versioned_frame,

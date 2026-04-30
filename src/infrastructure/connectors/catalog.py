@@ -1,15 +1,15 @@
-from __future__ import annotations
-
-from src.infrastructure.connectors.factory import build_destination_connector
-
-
-def build_connector_from_spec(destination_spec, credentials):
-    return build_destination_connector(
-        destination_type=destination_spec.type,
-        credentials=credentials,
-    )
+from src.infrastructure.connectors.impl.csv.factory import CsvConnectorFactory
+from src.infrastructure.connectors.impl.jobs_api.factory import JobsApiConnectorFactory
+from src.infrastructure.connectors.impl.memory.factory import MemoryConnectorFactory
+from src.infrastructure.connectors.impl.postgres.factory import PostgresConnectorFactory
+from src.infrastructure.connectors.impl.snowflake.factory import SnowflakeConnectorFactory
 
 
-DESTINATION_FACTORIES = {
-    "postgres": build_connector_from_spec,
+CONNECTOR_FACTORIES = {
+    "csv": CsvConnectorFactory(),
+    "file": CsvConnectorFactory(),
+    "jobs_api": JobsApiConnectorFactory(),
+    "memory": MemoryConnectorFactory(),
+    "postgres": PostgresConnectorFactory(),
+    "snowflake": SnowflakeConnectorFactory(),
 }

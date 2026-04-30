@@ -1,0 +1,66 @@
+connectors:
+  jobs_api_berlin:
+    type: jobs_api
+    roles: [extractor]
+    resource_name: jobs
+    config:
+      search_term: data scientist
+      location: Berlin
+      results_wanted: 20
+
+  local_jobs_csv:
+    type: csv
+    roles: [extractor]
+    resource_name: jobs
+    config:
+      file_path: data/jobs.csv
+
+  local_postgres:
+    type: postgres
+    roles: [extractor, loader]
+    credentials:
+      host: ${POSTGRES_HOST:localhost}
+      port: ${POSTGRES_PORT:5432}
+      database: ${POSTGRES_DB:world}
+      user: ${POSTGRES_USER:postgres}
+      password: ${POSTGRES_PASSWORD:postgres}
+
+  postgres_jobs:
+    type: postgres
+    roles: [extractor]
+    resource_name: jobs
+    credentials:
+      host: ${POSTGRES_HOST:localhost}
+      port: ${POSTGRES_PORT:5432}
+      database: ${POSTGRES_DB:world}
+      user: ${POSTGRES_USER:postgres}
+      password: ${POSTGRES_PASSWORD:postgres}
+    config:
+      query: SELECT * FROM jobs
+
+  snowflake_dev:
+    type: snowflake
+    roles: [extractor, loader]
+    credentials:
+      account: ${SNOWFLAKE_ACCOUNT}
+      user: ${SNOWFLAKE_USER}
+      password: ${SNOWFLAKE_PASSWORD}
+      warehouse: ${SNOWFLAKE_WAREHOUSE}
+      database: ${SNOWFLAKE_DATABASE}
+      schema: ${SNOWFLAKE_SCHEMA}
+      role: ${SNOWFLAKE_ROLE}
+
+  snowflake_jobs:
+    type: snowflake
+    roles: [extractor]
+    resource_name: jobs
+    credentials:
+      account: ${SNOWFLAKE_ACCOUNT}
+      user: ${SNOWFLAKE_USER}
+      password: ${SNOWFLAKE_PASSWORD}
+      warehouse: ${SNOWFLAKE_WAREHOUSE}
+      database: ${SNOWFLAKE_DATABASE}
+      schema: ${SNOWFLAKE_SCHEMA}
+      role: ${SNOWFLAKE_ROLE}
+    config:
+      query: SELECT * FROM RAW_JOBS

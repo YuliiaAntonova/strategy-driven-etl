@@ -1,27 +1,20 @@
 # Extensibility
 
-## Add new source
+## Add a new connector (source and/or destination)
 
-Register in:
+1. Implement `BaseConnectorFactory` under `src/infrastructure/connectors/impl/<name>/factory.py`
+   (`create_extractor` / `create_loader`, `ConnectorCapabilities`).
+2. Register the factory instance in `src/infrastructure/connectors/catalog.py` (`CONNECTOR_FACTORIES`).
 
-```text
-src/infrastructure/extractors/catalog.py
-```
+Connection YAML profiles live in `config/connectors.yml`.
 
-## Add new destination
+## Add a new transform
 
-Register in:
+Register the factory in `src/infrastructure/transformers/catalog.py` (`TRANSFORM_FACTORIES`).
 
-```text
-src/infrastructure/connectors/catalog.py
-```
+## Wire detector / writer modes
 
-## Add new transform
+- Detectors: `src/application/pipeline/registry.py` (`DETECTOR_FACTORIES`).
+- Writers per backend: `src/application/pipeline/writer_dispatch.py` (`_WRITER_CLASSES`) and optional profile in `profiles.py`.
 
-Register in:
-
-```text
-src/infrastructure/transformers/catalog.py
-```
-
-No changes required in pipeline or test.py.
+No changes are required in `test.py` unless you add a new runnable entrypoint.

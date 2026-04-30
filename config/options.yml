@@ -3,11 +3,10 @@ options:
     table_name: jobs
 
     load_behavior:
-      profile: full_refresh
+      profile: historized_snapshot
 
       primary_key: id
 
-      enable_hash: true
       hash_column: row_hash
       hash_columns:
         - title
@@ -16,15 +15,6 @@ options:
         - description
         - job_type
 
-      enable_generated_id: true
-      generated_id_column: id
-      generated_id_columns:
-        - title
-        - company
-        - location
-
     runtime:
-      full_load: true
-      use_chunks: false
-      extract_chunk_size: null
-      write_chunk_size: null
+      extract_chunk_size: 3
+      write_chunk_size: 6
